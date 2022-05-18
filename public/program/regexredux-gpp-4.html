@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>regex-redux C++ g++&nbsp;#4 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>regex-redux C++ g++&nbsp;#4 program</h1>
+    <aside>
+      <p><a href="../description/regexredux.html#regexredux">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">   contributed by Filip Sajdak</span>
+<span class="com">*/</span>
+
+<span class="ppc">#include &lt;pcre.h&gt;</span>
+<span class="ppc">#include &lt;iostream&gt;</span>
+<span class="ppc">#include &lt;memory&gt;</span>
+<span class="ppc">#include &lt;string&gt;</span>
+<span class="ppc">#include &lt;string_view&gt;</span>
+
+<span class="kwc">template</span> &lt;typename T&gt;
+<span class="kwc">auto</span> <span class="kwd">reserve</span>(<span class="kwb">size_t</span> size) {
+   T out;
+   out.<span class="kwd">reserve</span>(size);
+   <span class="kwa">return</span> out;
+}
+
+<span class="kwc">template</span> &lt;<span class="kwc">auto</span> initial_size = <span class="num">16384</span>, <span class="kwc">auto</span> buffer_size = initial_size&gt;
+<span class="kwc">auto</span> <span class="kwd">load</span>(std::istream&amp; in) {
+      <span class="kwc">auto</span> str = reserve&lt;std::string&gt;(initial_size);
+      <span class="kwc">auto</span> buffer = std::array&lt;<span class="kwb">char</span>, buffer_size&gt;();
+
+      <span class="kwa">while</span> (in) {
+         in.<span class="kwd">read</span>(buffer.<span class="kwd">data</span>(), buffer.<span class="kwd">size</span>());
+         str.<span class="kwd">append</span>(buffer.<span class="kwd">cbegin</span>(), buffer.<span class="kwd">cbegin</span>()+in.<span class="kwd">gcount</span>());
+      }
+      
+      <span class="kwa">return</span> str;
+}
+
+<span class="kwc">template</span>&lt;typename T, typename Deleter&gt;
+<span class="kwc">auto</span> <span class="kwd">make_unique_with_deleter</span>(T* ptr, Deleter&amp;&amp; deleter)
+{
+    <span class="kwa">return</span> std::unique_ptr&lt;T, Deleter&gt;(ptr, std::forward&lt;Deleter&gt;(deleter));
+} 
+
+   <span class="kwc">auto</span> <span class="kwd">make_regex</span>(<span class="kwb">const</span> std::string_view pattern) {
+      <span class="kwb">char const</span>* error;
+      <span class="kwb">int</span> offset;
+      <span class="kwa">return</span> <span class="kwd">make_unique_with_deleter</span>(
+         <span class="kwd">pcre_compile</span>(pattern.<span class="kwd">data</span>(), <span class="num">0</span>, &amp;error, &amp;offset, NULL), pcre_free);
+   }
+   
+   <span class="kwc">auto</span> <span class="kwd">make_aid</span>(<span class="kwb">const</span> pcre* regex) {
+      <span class="kwb">char const</span>* error;
+      <span class="kwa">return</span> <span class="kwd">make_unique_with_deleter</span>(
+         <span class="kwd">pcre_study</span>(regex, PCRE_STUDY_JIT_COMPILE, &amp;error), pcre_free_study);
+   }
+
+<span class="kwb">static void</span> <span class="kwd">replace</span>(<span class="kwb">const</span> std::string_view pattern, <span class="kwb">const</span> std::string_view replacement,
+       <span class="kwb">const</span> std::string_view source, std::string&amp; output, pcre_jit_stack* <span class="kwb">const</span> stack){
+
+   <span class="kwb">const</span> <span class="kwc">auto</span> regex = <span class="kwd">make_regex</span>(pattern);
+   <span class="kwb">const</span> <span class="kwc">auto</span> aid   = <span class="kwd">make_aid</span>(regex.<span class="kwd">get</span>());
+
+   <span class="kwb">int</span> pos = <span class="num">0</span>;
+   
+   <span class="kwa">for</span>(<span class="kwb">int</span> match[<span class="num">3</span>]; <span class="kwd">pcre_jit_exec</span>(regex.<span class="kwd">get</span>(), aid.<span class="kwd">get</span>(), source.<span class="kwd">data</span>(),
+         source.<span class="kwd">size</span>(), pos, <span class="num">0</span>, match, <span class="num">3</span>, stack) &gt;= <span class="num">0</span>; pos = match[<span class="num">1</span>]){
+      output.<span class="kwd">append</span>(std::<span class="kwd">cbegin</span>(source) + pos, std::<span class="kwd">cbegin</span>(source) + match[<span class="num">0</span>]);
+      output.<span class="kwd">append</span>(std::<span class="kwd">cbegin</span>(replacement), std::<span class="kwd">cend</span>(replacement));
+    }
+
+   output.<span class="kwd">append</span>(std::<span class="kwd">cbegin</span>(source) + pos, std::<span class="kwd">cend</span>(source));
+}
+
+
+<span class="kwb">int</span> <span class="kwd">main</span>(<span class="kwb">void</span>){
+   std::ios::<span class="kwd">sync_with_stdio</span>(<span class="kwa">false</span>);
+   
+    <span class="kwb">char const</span> * <span class="kwb">const</span> count_Info[]={
+        <span class="str">&quot;agggtaaa|tttaccct&quot;</span>,
+        <span class="str">&quot;[cgt]gggtaaa|tttaccc[acg]&quot;</span>,
+        <span class="str">&quot;a[act]ggtaaa|tttacc[agt]t&quot;</span>,
+        <span class="str">&quot;ag[act]gtaaa|tttac[agt]ct&quot;</span>,
+        <span class="str">&quot;agg[act]taaa|ttta[agt]cct&quot;</span>,
+        <span class="str">&quot;aggg[acg]aaa|ttt[cgt]ccct&quot;</span>,
+        <span class="str">&quot;agggt[cgt]aa|tt[acg]accct&quot;</span>,
+        <span class="str">&quot;agggta[cgt]a|t[acg]taccct&quot;</span>,
+        <span class="str">&quot;agggtaa[cgt]|[acg]ttaccct&quot;</span>
+      }, * <span class="kwb">const</span> replace_Info[][<span class="num">2</span>]={
+        {<span class="str">&quot;tHa[Nt]&quot;</span>, <span class="str">&quot;&lt;4&gt;&quot;</span>},
+        {<span class="str">&quot;aND|caN|Ha[DS]|WaS&quot;</span>, <span class="str">&quot;&lt;3&gt;&quot;</span>},
+        {<span class="str">&quot;a[NSt]|BY&quot;</span>, <span class="str">&quot;&lt;2&gt;&quot;</span>},
+        {<span class="str">&quot;&lt;[^&gt;]*&gt;&quot;</span>, <span class="str">&quot;|&quot;</span>},
+        {<span class="str">&quot;</span><span class="esc">\\</span><span class="str">|[^|][^|]*</span><span class="esc">\\</span><span class="str">|&quot;</span>, <span class="str">&quot;-&quot;</span>}
+      };
+
+   <span class="kwc">auto</span> sequences = reserve&lt;std::string&gt;(<span class="num">16384</span>);
+    <span class="kwb">size_t</span> postreplace_Size = <span class="num">0</span>;
+
+   std::string input = <span class="kwd">load</span>(std::cin);
+
+    <span class="ppc">#pragma omp parallel</span>
+    {
+      <span class="kwc">auto</span> stack = <span class="kwd">make_unique_with_deleter</span>(
+         <span class="kwd">pcre_jit_stack_alloc</span>(<span class="num">16384</span>, <span class="num">16384</span>), pcre_jit_stack_free);
+
+        <span class="ppc">#pragma omp single</span>
+        {
+            <span class="kwd">replace</span>(<span class="str">&quot;&gt;.*</span><span class="esc">\\</span><span class="str">n|</span><span class="esc">\\</span><span class="str">n&quot;</span>, <span class="str">&quot;&quot;</span>, input, sequences, stack.<span class="kwd">get</span>());
+        }
+
+        <span class="ppc">#pragma omp single nowait</span>
+        {
+            <span class="kwc">auto</span> prereplace_String = sequences;
+            <span class="kwc">auto</span> postreplace_String = reserve&lt;std::string&gt;(sequences.<span class="kwd">capacity</span>());
+         
+         <span class="kwa">for</span> ( <span class="kwb">const</span> <span class="kwc">auto</span>&amp; [pattern, replacement] : replace_Info ) {
+            postreplace_String.<span class="kwd">clear</span>();
+            <span class="kwd">replace</span>(pattern, replacement, 
+               prereplace_String, postreplace_String, stack.<span class="kwd">get</span>());
+            std::<span class="kwd">swap</span>(prereplace_String, postreplace_String);
+            }
+
+            postreplace_Size = prereplace_String.<span class="kwd">size</span>();
+        }
+
+        <span class="ppc">#pragma omp for schedule(dynamic) ordered</span>
+        <span class="kwa">for</span>(<span class="kwc">auto</span> i=<span class="num">0u</span>; i &lt; std::<span class="kwd">size</span>(count_Info); i++){
+
+         <span class="kwc">auto</span> regex = <span class="kwd">make_regex</span>(count_Info[i]);
+         <span class="kwc">auto</span> aid = <span class="kwd">make_aid</span>(regex.<span class="kwd">get</span>());
+         
+         <span class="kwb">int</span> count = <span class="num">0</span>;
+         <span class="kwa">for</span>(<span class="kwb">int</span> pos = <span class="num">0</span>, match[<span class="num">3</span>]; <span class="kwd">pcre_jit_exec</span>(regex.<span class="kwd">get</span>(), aid.<span class="kwd">get</span>(),
+               sequences.<span class="kwd">data</span>(), sequences.<span class="kwd">size</span>(), pos, <span class="num">0</span>, match, <span class="num">3</span>,
+               stack.<span class="kwd">get</span>()) &gt;= <span class="num">0</span>; pos=match[<span class="num">1</span>]) {
+            ++count;
+            }
+
+            <span class="ppc">#pragma omp ordered</span>
+            <span class="kwd">printf</span>(<span class="str">&quot;%s %d</span><span class="esc">\n</span><span class="str">&quot;</span>, count_Info[i], count);
+        }
+    }
+
+    <span class="kwd">printf</span>(<span class="str">&quot;</span><span class="esc">\n</span><span class="str">%zu</span><span class="esc">\n</span><span class="str">%zu</span><span class="esc">\n</span><span class="str">%zu</span><span class="esc">\n</span><span class="str">&quot;</span>, input.<span class="kwd">size</span>(), sequences.<span class="kwd">size</span>(), postreplace_Size);
+    <span class="kwa">return</span> <span class="num">0</span>;
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 22:24:01 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -std=c++17 -fopenmp -flto regexredux.gpp-4.c++ -o regexredux.gpp-4.c++.o &amp;&amp;  \
+        /usr/bin/g++ regexredux.gpp-4.c++.o -o regexredux.gpp-4.gpp_run -fopenmp -flto -lpcre 
+rm regexredux.gpp-4.c++
+
+3.46s to complete and log all make actions
+
+COMMAND LINE:
+./regexredux.gpp-4.gpp_run 0 &lt; regexredux-input5000000.txt
+
+PROGRAM OUTPUT:
+agggtaaa|tttaccct 356
+[cgt]gggtaaa|tttaccc[acg] 1250
+a[act]ggtaaa|tttacc[agt]t 4252
+ag[act]gtaaa|tttac[agt]ct 2894
+agg[act]taaa|ttta[agt]cct 5435
+aggg[acg]aaa|ttt[cgt]ccct 1537
+agggt[cgt]aa|tt[acg]accct 1431
+agggta[cgt]a|t[acg]taccct 1608
+agggtaa[cgt]|[acg]ttaccct 2178
+
+50833411
+50000000
+27388361
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

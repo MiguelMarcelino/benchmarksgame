@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>fasta C++ g++&nbsp;#7 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>fasta C++ g++&nbsp;#7 program</h1>
+    <aside>
+      <p><a href="../description/fasta.html#fasta">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com">https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">contributed by Sylvester Saguban</span>
+<span class="com">inspired from C++ G++ #7 from Rafal Rusin and contributors</span>
+<span class="com">- uses more features of C++17 and TS concept&apos;s &apos;auto&apos; function parameters</span>
+<span class="com">- more efficient multi-threading, which sadly is the reason why this</span>
+<span class="com"> this has more code than other implementations.</span>
+<span class="com">- data structure from array of struct to struct of arrays for better</span>
+<span class="com">  cache locality and higher chance of vectorization</span>
+<span class="com"></span>
+<span class="com">compile with g++ 7.2</span>
+<span class="com">with these flags -std=c++17 -march=native -O3 -msse -msse2 -msse3</span>
+<span class="com">*/</span>
+
+<span class="ppc">#include &lt;array&gt;</span>
+<span class="ppc">#include &lt;cstdio&gt;</span>
+<span class="ppc">#include &lt;thread&gt;</span>
+<span class="ppc">#include &lt;algorithm&gt;</span>
+<span class="ppc">#include &lt;mutex&gt;</span>
+<span class="ppc">#include &lt;condition_variable&gt;</span>
+<span class="ppc">#include &lt;atomic&gt;</span>
+
+<span class="kwb">struct</span> Config
+{
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> max_threads = <span class="num">8</span>;
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> min_threads = <span class="num">1</span>;
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> chars_per_line = <span class="num">60</span>;
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> max_proc = <span class="num">4</span>;
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> min_thread_work = (chars_per_line + <span class="num">1</span>) * <span class="num">84</span>;
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> max_thread_buff = (chars_per_line + <span class="num">1</span>) * <span class="num">1024</span>;
+
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> im = <span class="num">139968</span>, ia = <span class="num">3877</span>, ic = <span class="num">29573</span>;
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">float</span> reciprocal = <span class="num">1.0</span>f / im;
+    <span class="kwb">static</span> <span class="kwc">inline</span> <span class="kwb">FILE</span>* output = stdout;
+};
+
+<span class="kwc">class</span> ThreadMgr
+{
+    <span class="kwb">struct</span> Proc {
+        std::atomic&lt;<span class="kwb">bool</span>&gt;   once;
+        std::mutex          mtx;
+        <span class="kwb">unsigned</span>            index, index_reset;
+    };
+    std::atomic&lt;<span class="kwb">unsigned</span>&gt;       _out_sequence = <span class="num">0</span>;
+    std::mutex                  _gen_mutex, _out_mutex;
+    std::condition_variable     _cv;
+    Proc                        _proc[ Config::max_proc ];
+    <span class="kwb">unsigned</span>                    _id_ctr = <span class="num">0</span>, _threads = <span class="num">1</span>, _proc_ctr = <span class="num">0</span>;
+<span class="kwc">public</span>:
+    <span class="kwb">struct</span> Context {
+        <span class="kwb">unsigned</span>        index;
+        <span class="kwb">union</span> {
+            <span class="kwd">alignas</span>(<span class="num">16</span>) std::array&lt; <span class="kwb">int</span>, Config::max_thread_buff &gt; ibuff;
+            <span class="kwd">alignas</span>(<span class="num">16</span>) std::array&lt; <span class="kwb">char</span>, Config::max_thread_buff &gt; cbuff;
+        };
+    };
+
+    <span class="kwb">void</span> <span class="kwd">SetThreadCount</span>( <span class="kwb">unsigned</span> count ) {
+        _threads = std::<span class="kwd">clamp</span>( count, Config::min_threads,
+                               Config::max_threads );
+    }
+
+    <span class="kwc">inline</span> <span class="kwb">void</span> <span class="kwd">SyncOutput</span>( <span class="kwb">unsigned</span> index, <span class="kwb">const</span> <span class="kwc">auto</span>&amp; function ) {
+        std::unique_lock <span class="kwd">lock</span>(_out_mutex);
+        _cv.<span class="kwd">wait</span>( lock, [=]{ <span class="kwa">return</span> index == _out_sequence; });
+        <span class="kwd">function</span>();
+        ++_out_sequence;
+        _cv.<span class="kwd">notify_all</span>();
+    }
+
+    <span class="kwc">auto</span> <span class="kwd">Make</span>( <span class="kwb">const</span> std::string_view&amp; text, <span class="kwb">unsigned</span> size, <span class="kwc">auto</span> output ) {
+        <span class="kwb">unsigned</span> id = _id_ctr++;
+        <span class="kwc">auto</span>&amp; proc = _proc[ _proc_ctr++ ];
+        <span class="kwa">return</span> [=, &amp;proc]( ThreadMgr::Context&amp; tdata ) {
+            <span class="kwa">if</span>( proc.once.<span class="kwd">exchange</span>(<span class="kwa">false</span>) )
+                <span class="kwa">this</span>-&gt;<span class="kwd">SyncOutput</span>( id, [&amp;]{
+                std::<span class="kwd">fwrite</span>( text.<span class="kwd">data</span>(), <span class="num">1</span>, text.<span class="kwd">size</span>(), Config::output );
+                <span class="kwd">output</span>( size, tdata );
+            });
+        };
+    }
+
+    <span class="kwc">auto</span> <span class="kwd">Make</span>( <span class="kwb">const</span> std::string_view&amp; text, <span class="kwb">unsigned</span> size,
+               <span class="kwc">auto</span> generate, <span class="kwc">auto</span> convert, <span class="kwc">auto</span> output ) {
+        <span class="kwb">unsigned</span> work_count = std::<span class="kwd">clamp</span>( size / _threads,
+                                          Config::min_thread_work,
+                                          Config::max_thread_buff );
+        <span class="kwb">unsigned</span> id = _id_ctr++;
+        <span class="kwb">unsigned</span> limit = id + (size / work_count) + (size % work_count != <span class="num">0</span>);
+        _id_ctr = limit + <span class="num">1</span>;
+        <span class="kwc">auto</span>&amp; proc = _proc[ _proc_ctr++ ];
+        proc.index_reset = id + <span class="num">1</span>;
+
+        <span class="kwa">return</span> [=, &amp;proc]( ThreadMgr::Context&amp; tdata ) {
+            <span class="kwa">if</span>( proc.once.<span class="kwd">exchange</span>(<span class="kwa">false</span>) )
+                <span class="kwa">this</span>-&gt;<span class="kwd">SyncOutput</span>( id, [&amp;] {
+                std::<span class="kwd">fwrite</span>( text.<span class="kwd">data</span>(), <span class="num">1</span>, text.<span class="kwd">size</span>(), Config::output );
+            });
+
+            <span class="kwb">unsigned</span> start_index = id + <span class="num">1</span>;
+            <span class="kwa">while</span>(<span class="kwa">true</span>) {
+                <span class="kwb">unsigned</span> cvsize;
+                {
+                    std::scoped_lock <span class="kwd">lock</span>(_gen_mutex);
+                    {
+                        std::scoped_lock <span class="kwd">lock</span>(proc.mtx);
+                        <span class="kwa">if</span>( proc.index &gt; limit )
+                            <span class="kwa">break</span>;
+                        tdata.index = proc.index++;
+                    }
+                    cvsize = std::<span class="kwd">min</span>( work_count, size -
+                                       (((tdata.index - start_index)
+                                         * work_count)) );
+                    <span class="kwd">generate</span>( cvsize, tdata );
+                }
+
+                <span class="kwb">unsigned</span> char_count = <span class="kwd">convert</span>( cvsize, start_index,
+                                               work_count, tdata );
+
+                <span class="kwa">this</span>-&gt;<span class="kwd">SyncOutput</span>( tdata.index, [&amp;] {
+                    <span class="kwa">if</span>( tdata.index == limit &amp;&amp;
+                            tdata.cbuff[char_count-<span class="num">1</span>] != <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span> )
+                        tdata.cbuff[char_count++] = <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+                    <span class="kwd">output</span>( char_count, tdata );
+                });
+            }
+        };
+    }
+
+    <span class="kwb">void</span> <span class="kwd">RunSequence</span>( <span class="kwc">auto</span>... f ){
+        <span class="kwa">static_assert</span>( <span class="kwa">sizeof</span>...(f) &lt;= Config::max_proc,
+                       <span class="str">&quot;function chain is too large, &quot;</span>
+                       <span class="str">&quot;increase Config::max_proc.&quot;</span> );
+        std::thread threads[ Config::max_threads ];
+
+        _out_sequence = <span class="num">0</span>;
+        _proc_ctr = <span class="num">0</span>;
+        <span class="kwa">for</span>( <span class="kwc">auto</span>&amp; i : _proc ) {
+            i.once = <span class="kwa">true</span>;
+            i.index = i.index_reset;
+        }
+
+        <span class="kwa">for</span>( <span class="kwb">unsigned</span> i = <span class="num">0</span>; i &lt; _threads; ++i )
+            threads[i] = std::<span class="kwd">thread</span>( [=]{
+                Context tdata = {<span class="num">0</span>};
+                (<span class="kwd">f</span>( tdata ), ...);
+            });
+
+        <span class="kwa">for</span>( <span class="kwb">unsigned</span> i = <span class="num">0</span>; i &lt; _threads; ++i )
+            threads[i].<span class="kwd">join</span>();
+    }
+} gdata;
+
+<span class="kwb">int</span> <span class="kwd">main</span>(<span class="kwb">int</span> argc, <span class="kwb">char</span> *argv[])
+{
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> <span class="kwb">char</span> alu[] =
+        <span class="str">&quot;GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAG&quot;</span>
+        <span class="str">&quot;GTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGC&quot;</span>
+        <span class="str">&quot;CGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCC&quot;</span>
+        <span class="str">&quot;GGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTC&quot;</span>
+        <span class="str">&quot;CGTCTCAAAAA&quot;</span>;
+
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> std::array&lt; std::pair&lt; <span class="kwb">float</span>, <span class="kwb">char</span> &gt;, <span class="num">15</span>&gt; iub = {{
+         { <span class="num">0.27</span>f, <span class="str">&apos;a&apos;</span> }, { <span class="num">0.12</span>f, <span class="str">&apos;c&apos;</span> }, { <span class="num">0.12</span>f, <span class="str">&apos;g&apos;</span> }, { <span class="num">0.27</span>f, <span class="str">&apos;t&apos;</span> },
+         { <span class="num">0.02</span>f, <span class="str">&apos;B&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;D&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;H&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;K&apos;</span> },
+         { <span class="num">0.02</span>f, <span class="str">&apos;M&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;N&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;R&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;S&apos;</span> },
+         { <span class="num">0.02</span>f, <span class="str">&apos;V&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;W&apos;</span> }, { <span class="num">0.02</span>f, <span class="str">&apos;Y&apos;</span> }
+    }};
+
+    <span class="kwb">static</span> <span class="kwc">constexpr</span> std::array&lt; std::pair&lt; <span class="kwb">float</span>, <span class="kwb">char</span> &gt;, <span class="num">4</span>&gt; homosapiens = {{
+         { <span class="num">0.3029549426680</span>f, <span class="str">&apos;a&apos;</span> },
+         { <span class="num">0.1979883004921</span>f, <span class="str">&apos;c&apos;</span> },
+         { <span class="num">0.1975473066391</span>f, <span class="str">&apos;g&apos;</span> },
+         { <span class="num">0.3015094502008</span>f, <span class="str">&apos;t&apos;</span> }
+    }};
+
+    <span class="kwb">static</span> <span class="kwc">auto</span> make_commulative = []( <span class="kwb">const</span> <span class="kwc">auto</span>&amp; p ) {
+        <span class="kwb">struct</span> Ret {
+            <span class="kwd">alignas</span>(<span class="num">16</span>) std::array&lt; <span class="kwb">float</span>, p.<span class="kwd">size</span>() &gt;  real;
+            <span class="kwd">alignas</span>(<span class="num">16</span>) std::array&lt; <span class="kwb">char</span>, p.<span class="kwd">size</span>() &gt;  ch;
+        } ret{{p[<span class="num">0</span>].first}, {p[<span class="num">0</span>].second}};
+
+        <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = <span class="num">1</span>; i &lt; p.<span class="kwd">size</span>(); ++i ) {
+            ret.real[i] = ret.real[i-<span class="num">1</span>] + p[i].first;
+            ret.ch[i] = p[i].second;
+        }
+        <span class="kwa">return</span> ret;
+    };
+
+    <span class="kwb">static</span> <span class="kwc">auto</span> get_random = [] {
+        <span class="kwb">static unsigned</span> last = <span class="num">42</span>;
+        <span class="kwa">return</span> (last = (last * Config::ia + Config::ic) % Config::im);
+    };
+
+    <span class="kwb">static</span> <span class="kwc">auto</span> convert = []( <span class="kwb">const</span> <span class="kwc">auto</span>&amp; data, <span class="kwb">unsigned</span> size,
+            <span class="kwb">unsigned</span> start_index, <span class="kwb">unsigned</span> max_work,
+            ThreadMgr::Context&amp; tdata ) {
+        <span class="kwc">auto</span> iitr = tdata.ibuff.<span class="kwd">begin</span>(), iend = iitr + size;
+        <span class="kwc">auto</span> citr = tdata.cbuff.<span class="kwd">begin</span>();
+        <span class="kwc">auto</span> inner_loop = [&amp;]( <span class="kwc">auto</span> end ) {
+            <span class="kwa">while</span>( iitr != end ) {
+                <span class="kwc">auto</span> f = *iitr++ * Config::reciprocal;
+                <span class="kwc">auto</span> i = std::<span class="kwd">find_if</span>( data.real.<span class="kwd">begin</span>(),
+                                       data.real.<span class="kwd">end</span>(),
+                                       [f]( <span class="kwc">auto</span> t ){ <span class="kwa">return</span> f &lt;= t; });
+                *citr++ = data.ch[ i - data.real.<span class="kwd">begin</span>() ];
+            }
+            *citr++ = <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+        };
+
+        <span class="kwb">unsigned</span> aligner_count = Config::chars_per_line -
+                ((max_work * (tdata.index - start_index))
+                 % Config::chars_per_line);
+
+        <span class="kwa">if</span>( aligner_count &gt; <span class="num">0</span> )
+            <span class="kwd">inner_loop</span>( iitr + aligner_count );
+
+        <span class="kwb">unsigned</span> odd_count = (iend - iitr) % Config::chars_per_line;
+        <span class="kwc">auto</span> iend_blocks = iend - odd_count;
+        <span class="kwa">while</span>( iitr &lt; iend_blocks )
+            <span class="kwd">inner_loop</span>( iitr + Config::chars_per_line );
+
+        <span class="kwa">if</span>( odd_count ) {
+            <span class="kwd">inner_loop</span>( iitr + odd_count );
+            citr -= <span class="num">1</span>;
+        }
+        <span class="kwa">return</span> citr - tdata.cbuff.<span class="kwd">begin</span>();
+    };
+
+    <span class="kwc">auto</span> generate = []( <span class="kwb">unsigned</span> size, ThreadMgr::Context&amp; tdata ) {
+        <span class="kwa">for</span>( <span class="kwc">auto</span> i = tdata.ibuff.<span class="kwd">begin</span>(), end = i + size; i != end; ++i )
+            *i = <span class="kwd">get_random</span>();
+    };
+
+    <span class="kwc">auto</span> output = []( <span class="kwb">unsigned</span> size, ThreadMgr::Context&amp; tdata ) {
+        std::<span class="kwd">fwrite</span>( tdata.cbuff.<span class="kwd">data</span>(), <span class="num">1</span>, size, Config::output );
+    };
+
+    <span class="kwc">auto</span> alu_out = [&amp;]( <span class="kwb">unsigned</span> size, ThreadMgr::Context&amp; ) {
+        <span class="kwb">static</span> <span class="kwc">constexpr auto</span> alu_data = [&amp;] {
+            <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> char_count = (Config::chars_per_line + <span class="num">1</span>)
+                    * (<span class="kwa">sizeof</span>(alu) - <span class="num">1</span>);
+
+            std::array&lt; <span class="kwb">char</span>, char_count &gt; ret{};
+            <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = <span class="num">0</span>, j = <span class="num">0</span>; i &lt; char_count; ++i, ++j) {
+                <span class="kwb">unsigned</span> ul = std::<span class="kwd">min</span>(i + Config::chars_per_line, char_count);
+                <span class="kwa">for</span>(; i &lt; ul; ++i )
+                    ret[i] = alu[ (i - j) % (<span class="kwa">sizeof</span>(alu) - <span class="num">1</span>)];
+                ret[i] = <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+            }
+            <span class="kwa">return</span> ret;
+        }();
+
+        <span class="kwc">constexpr</span> <span class="kwb">unsigned</span> char_count = Config::chars_per_line *
+                (<span class="kwa">sizeof</span>(alu) - <span class="num">1</span>);
+        <span class="kwa">for</span>(; size &gt;= char_count; size -= char_count )
+            std::<span class="kwd">fwrite</span>( alu_data.<span class="kwd">data</span>(), <span class="num">1</span>, alu_data.<span class="kwd">size</span>(), Config::output );
+        std::<span class="kwd">fwrite</span>( alu_data.<span class="kwd">data</span>(), <span class="num">1</span>, size +
+                     (size / Config::chars_per_line), Config::output );
+        std::<span class="kwd">putc</span>(<span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>, Config::output );
+    };
+
+    <span class="kwc">auto</span> iub_convert = []( <span class="kwb">unsigned</span> size, <span class="kwb">unsigned</span> start_index,
+            <span class="kwb">unsigned</span> max_work, ThreadMgr::Context&amp; tdata ) {
+        <span class="kwb">static</span> <span class="kwc">constexpr auto</span> iub_data = <span class="kwd">make_commulative</span>( iub );
+        <span class="kwa">return</span> <span class="kwd">convert</span>( iub_data, size, start_index, max_work, tdata  );
+    };
+
+    <span class="kwc">auto</span> homo_convert = []( <span class="kwb">unsigned</span> size, <span class="kwb">unsigned</span> start_index,
+            <span class="kwb">unsigned</span> max_work, ThreadMgr::Context&amp; tdata ) {
+        <span class="kwb">static</span> <span class="kwc">constexpr auto</span> hom_data = <span class="kwd">make_commulative</span>( homosapiens );
+        <span class="kwa">return</span> <span class="kwd">convert</span>( hom_data, size, start_index, max_work, tdata  );
+    };
+
+    gdata.<span class="kwd">SetThreadCount</span>( std::thread::<span class="kwd">hardware_concurrency</span>() );
+
+    <span class="kwb">unsigned</span> n = std::<span class="kwd">max</span>( <span class="num">1000</span>, std::<span class="kwd">atoi</span>( argv[<span class="num">1</span>] ) );
+
+    <span class="kwb">const</span> <span class="kwc">auto</span> alu_proc = gdata.<span class="kwd">Make</span>( <span class="str">&quot;&gt;ONE Homo sapiens alu</span><span class="esc">\n</span><span class="str">&quot;</span>,
+                                      n * <span class="num">2</span>, alu_out );
+
+    <span class="kwb">const</span> <span class="kwc">auto</span> iub_proc = gdata.<span class="kwd">Make</span>( <span class="str">&quot;&gt;TWO IUB ambiguity codes</span><span class="esc">\n</span><span class="str">&quot;</span>,
+                                      n * <span class="num">3</span>, generate, iub_convert, output );
+
+    <span class="kwb">const</span> <span class="kwc">auto</span> homo_proc = gdata.<span class="kwd">Make</span>( <span class="str">&quot;&gt;THREE Homo sapiens frequency</span><span class="esc">\n</span><span class="str">&quot;</span>,
+                                       n * <span class="num">5</span>, generate, homo_convert, output );
+
+    gdata.<span class="kwd">RunSequence</span>( alu_proc, iub_proc, homo_proc );
+    <span class="kwa">return</span> <span class="num">0</span>;
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 21:13:46 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -std=c++17 fasta.gpp-7.c++ -o fasta.gpp-7.c++.o &amp;&amp;  \
+        /usr/bin/g++ fasta.gpp-7.c++.o -o fasta.gpp-7.gpp_run -lpthread 
+fasta.gpp-7.c++:64:51: warning: use of ‘auto’ in parameter declaration only available with ‘-fconcepts-ts’
+   64 |     inline void SyncOutput( unsigned index, const auto&amp; function ) {
+      |                                                   ^~~~
+fasta.gpp-7.c++:72:61: warning: use of ‘auto’ in parameter declaration only available with ‘-fconcepts-ts’
+   72 |     auto Make( const std::string_view&amp; text, unsigned size, auto output ) {
+      |                                                             ^~~~
+fasta.gpp-7.c++:85:16: warning: use of ‘auto’ in parameter declaration only available with ‘-fconcepts-ts’
+   85 |                auto generate, auto convert, auto output ) {
+      |                ^~~~
+fasta.gpp-7.c++:85:31: warning: use of ‘auto’ in parameter declaration only available with ‘-fconcepts-ts’
+   85 |                auto generate, auto convert, auto output ) {
+      |                               ^~~~
+fasta.gpp-7.c++:85:45: warning: use of ‘auto’ in parameter declaration only available with ‘-fconcepts-ts’
+   85 |                auto generate, auto convert, auto output ) {
+      |                                             ^~~~
+fasta.gpp-7.c++:131:23: warning: use of ‘auto’ in parameter declaration only available with ‘-fconcepts-ts’
+  131 |     void RunSequence( auto... f ){
+      |                       ^~~~
+fasta.gpp-7.c++: In instantiation of ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’:
+fasta.gpp-7.c++:182:9:   required from ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 15&gt;]’
+fasta.gpp-7.c++:266:58:   required from here
+fasta.gpp-7.c++:180:56: error: ‘p’ is not a constant expression
+  180 |             alignas(16) std::array&lt; float, p.size() &gt;  real;
+      |                                                        ^~~~
+fasta.gpp-7.c++:180:50: note: in template argument for type ‘long unsigned int’
+  180 |             alignas(16) std::array&lt; float, p.size() &gt;  real;
+      |                                            ~~~~~~^~
+fasta.gpp-7.c++:181:55: error: ‘p’ is not a constant expression
+  181 |             alignas(16) std::array&lt; char, p.size() &gt;  ch;
+      |                                                       ^~
+fasta.gpp-7.c++:181:49: note: in template argument for type ‘long unsigned int’
+  181 |             alignas(16) std::array&lt; char, p.size() &gt;  ch;
+      |                                           ~~~~~~^~
+fasta.gpp-7.c++: In instantiation of ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 15&gt;]’:
+fasta.gpp-7.c++:266:58:   required from here
+fasta.gpp-7.c++:182:11: error: too many initializers for ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’
+  182 |         } ret{{p[0].first}, {p[0].second}};
+      |           ^~~
+fasta.gpp-7.c++:185:17: error: ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  185 |             ret.real[i] = ret.real[i-1] + p[i].first;
+      |             ~~~~^~~~
+fasta.gpp-7.c++:185:31: error: ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  185 |             ret.real[i] = ret.real[i-1] + p[i].first;
+      |                           ~~~~^~~~
+fasta.gpp-7.c++:186:17: error: ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘ch’
+  186 |             ret.ch[i] = p[i].second;
+      |             ~~~~^~
+fasta.gpp-7.c++: In lambda function:
+fasta.gpp-7.c++:266:58: error: call to non-‘constexpr’ function ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 15&gt;]’
+  266 |         static constexpr auto iub_data = make_commulative( iub );
+      |                                          ~~~~~~~~~~~~~~~~^~~~~~~
+fasta.gpp-7.c++:178:36: note: ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 15&gt;]’ is not usable as a ‘constexpr’ function because:
+  178 |     static auto make_commulative = []( const auto&amp; p ) {
+      |                                    ^
+fasta.gpp-7.c++: In instantiation of ‘main(int, char**)::&lt;lambda(const auto:9&amp;, unsigned int, unsigned int, unsigned int, ThreadMgr::Context&amp;)&gt; [with auto:9 = main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret]’:
+fasta.gpp-7.c++:267:23:   required from here
+fasta.gpp-7.c++:204:45: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  204 |                 auto i = std::find_if( data.real.begin(),
+      |                                        ~~~~~^~~~
+fasta.gpp-7.c++:205:45: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  205 |                                        data.real.end(),
+      |                                        ~~~~~^~~~
+fasta.gpp-7.c++:207:32: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘ch’
+  207 |                 *citr++ = data.ch[ i - data.real.begin() ];
+      |                           ~~~~~^~
+fasta.gpp-7.c++:207:45: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  207 |                 *citr++ = data.ch[ i - data.real.begin() ];
+      |                                        ~~~~~^~~~
+fasta.gpp-7.c++: In instantiation of ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’:
+fasta.gpp-7.c++:182:9:   required from ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 4&gt;]’
+fasta.gpp-7.c++:272:58:   required from here
+fasta.gpp-7.c++:180:56: error: ‘p’ is not a constant expression
+  180 |             alignas(16) std::array&lt; float, p.size() &gt;  real;
+      |                                                        ^~~~
+fasta.gpp-7.c++:180:50: note: in template argument for type ‘long unsigned int’
+  180 |             alignas(16) std::array&lt; float, p.size() &gt;  real;
+      |                                            ~~~~~~^~
+fasta.gpp-7.c++:181:55: error: ‘p’ is not a constant expression
+  181 |             alignas(16) std::array&lt; char, p.size() &gt;  ch;
+      |                                                       ^~
+fasta.gpp-7.c++:181:49: note: in template argument for type ‘long unsigned int’
+  181 |             alignas(16) std::array&lt; char, p.size() &gt;  ch;
+      |                                           ~~~~~~^~
+fasta.gpp-7.c++: In instantiation of ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 4&gt;]’:
+fasta.gpp-7.c++:272:58:   required from here
+fasta.gpp-7.c++:182:11: error: too many initializers for ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’
+  182 |         } ret{{p[0].first}, {p[0].second}};
+      |           ^~~
+fasta.gpp-7.c++:185:17: error: ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  185 |             ret.real[i] = ret.real[i-1] + p[i].first;
+      |             ~~~~^~~~
+fasta.gpp-7.c++:185:31: error: ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  185 |             ret.real[i] = ret.real[i-1] + p[i].first;
+      |                           ~~~~^~~~
+fasta.gpp-7.c++:186:17: error: ‘struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘ch’
+  186 |             ret.ch[i] = p[i].second;
+      |             ~~~~^~
+fasta.gpp-7.c++: In lambda function:
+fasta.gpp-7.c++:272:58: error: call to non-‘constexpr’ function ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 4&gt;]’
+  272 |         static constexpr auto hom_data = make_commulative( homosapiens );
+      |                                          ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~
+fasta.gpp-7.c++:178:36: note: ‘main(int, char**)::&lt;lambda(const auto:8&amp;)&gt; [with auto:8 = std::array&lt;std::pair&lt;float, char&gt;, 4&gt;]’ is not usable as a ‘constexpr’ function because:
+  178 |     static auto make_commulative = []( const auto&amp; p ) {
+      |                                    ^
+fasta.gpp-7.c++: In instantiation of ‘main(int, char**)::&lt;lambda(const auto:9&amp;, unsigned int, unsigned int, unsigned int, ThreadMgr::Context&amp;)&gt; [with auto:9 = main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret]’:
+fasta.gpp-7.c++:273:23:   required from here
+fasta.gpp-7.c++:204:45: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  204 |                 auto i = std::find_if( data.real.begin(),
+      |                                        ~~~~~^~~~
+fasta.gpp-7.c++:205:45: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  205 |                                        data.real.end(),
+      |                                        ~~~~~^~~~
+fasta.gpp-7.c++:207:32: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘ch’
+  207 |                 *citr++ = data.ch[ i - data.real.begin() ];
+      |                           ~~~~~^~
+fasta.gpp-7.c++:207:45: error: ‘const struct main(int, char**)::&lt;lambda(const auto:8&amp;)&gt;::Ret’ has no member named ‘real’
+  207 |                 *citr++ = data.ch[ i - data.real.begin() ];
+      |                                        ~~~~~^~~~
+make: [/home/dunham/all-benchmarksgame/2000-benchmarksgame/nanobench/makefiles/u64q.programs.Makefile:54: fasta.gpp-7.gpp_run] Error 1 (ignored)
+rm fasta.gpp-7.c++
+
+2.50s to complete and log all make actions
+
+COMMAND LINE:
+./fasta.gpp-7.gpp_run 250000
+
+MAKE ERROR 
+
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

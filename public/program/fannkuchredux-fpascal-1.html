@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>fannkuch-redux Free Pascal program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>fannkuch-redux Free Pascal program</h1>
+    <aside>
+      <p><a href="../description/fannkuchredux.html#fannkuchredux">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">(* The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">   contributed by Jean de La Taille</span>
+<span class="com">*)</span>
+
+<span class="kwa">program</span> project1;
+
+<span class="kwa">uses</span>
+  <span class="com">{$IFDEF UNIX}</span>
+  cthreads,
+  <span class="com">{$ENDIF}</span>
+  SysUtils, DateUtils, Math;
+
+<span class="kwa">type</span>
+  arrWord = <span class="kwa">array</span>[<span class="num">0</span>.<span class="num">.12</span>] <span class="kwa">of</span> <span class="kwb">Word</span>;
+  threadData = <span class="kwa">record</span>
+    num, n, count, checksum : <span class="kwb">longint</span>;
+    list, counters, limits : arrWord;
+  <span class="kwa">end</span>;
+
+<span class="com">(******************************************************************************)</span>
+
+<span class="com">(* Thread *)</span>
+<span class="kwa">function</span> <span class="kwd">run</span>(p : <span class="kwb">pointer</span>) : ptrint;
+<span class="kwa">var</span>
+  i, k, l, <span class="com">(*n,*)</span> num : <span class="kwb">longint</span>;
+  count, maxCount, checksum : <span class="kwb">longint</span>;
+  f : <span class="kwb">boolean</span>;
+  list, counters, limits : arrWord;
+
+  <span class="slc">// Flip function</span>
+  <span class="kwa">function</span> flip : <span class="kwb">longint</span>; <span class="kwa">inline</span>;
+  <span class="kwa">var</span>
+    count, f, i, j, k, tmp : <span class="kwb">longint</span>;
+    tmpList : arrWord;
+  <span class="kwa">begin</span>
+    tmpList := list;
+    count := <span class="num">0</span>;
+    <span class="slc">// While the head list is not 1, do lot of reverse</span>
+    f := tmpList[<span class="num">0</span>];
+    <span class="kwc">while</span> (f &lt;&gt; <span class="num">1</span>) <span class="kwc">do</span>
+    <span class="kwa">begin</span>
+      <span class="slc">// Reverse</span>
+      j := f &gt;&gt; <span class="num">1</span>;
+      k := f - <span class="num">1</span>;
+      <span class="kwc">for</span> i := <span class="num">0</span> <span class="kwc">to</span> j - <span class="num">1</span> <span class="kwc">do</span>
+      <span class="kwa">begin</span>
+        tmp := tmpList[i];
+        tmpList[i] := tmpList[k];
+        tmpList[k] := tmp;
+        <span class="kwd">Dec</span>(k);
+      <span class="kwa">end</span>;
+      f := tmpList[<span class="num">0</span>];
+      <span class="slc">// End of reverse</span>
+      <span class="kwd">Inc</span>(count);
+    <span class="kwa">end</span>;
+    flip := count;
+  <span class="kwa">end</span>;
+  <span class="slc">// Swap function</span>
+  <span class="kwa">procedure</span> <span class="kwd">swap</span>(<span class="kwa">var</span> a, b : <span class="kwb">word</span>); <span class="kwa">inline</span>;
+  <span class="kwa">begin</span>
+    l := a;
+    a := b;
+    b := l;
+  <span class="kwa">end</span>;
+  <span class="slc">// Roll3 function</span>
+  <span class="kwa">procedure</span> <span class="kwd">roll3</span>(<span class="kwa">var</span> a, b, c : <span class="kwb">word</span>); <span class="kwa">inline</span>;
+  <span class="kwa">begin</span>
+    l := a;
+    a := b;
+    b := c;
+    c := l;
+  <span class="kwa">end</span>;
+  <span class="slc">// Roll function</span>
+  <span class="kwa">procedure</span> <span class="kwd">roll</span>(k : <span class="kwb">longint</span>); <span class="kwa">inline</span>;
+  <span class="kwa">var</span>
+    j : <span class="kwb">longint</span>;
+  <span class="kwa">begin</span>
+    l := list[<span class="num">0</span>];
+    <span class="kwc">for</span> j := <span class="num">0</span> <span class="kwc">to</span> k <span class="kwc">do</span>
+      list[j] := list[j + <span class="num">1</span>];
+    list[j] := l;
+  <span class="kwa">end</span>;
+
+<span class="kwa">begin</span>
+  <span class="slc">/// n := threadData(p^).n;</span>
+  num := <span class="kwd">threadData</span>(p^).num;
+  limits := <span class="kwd">threadData</span>(p^).limits;
+  counters := <span class="kwd">threadData</span>(p^).counters;
+  list := <span class="kwd">threadData</span>(p^).list;
+  <span class="slc">/// WriteLn(n, &apos; &apos;, num, &apos; &apos;, list[0]);</span>
+  <span class="slc">// Main loop</span>
+  f := <span class="kwb">false</span>;
+  maxCount := <span class="num">0</span>;
+  checksum := <span class="num">0</span>;
+  <span class="kwc">for</span> i := <span class="num">1</span> <span class="kwc">to</span> num <span class="kwc">do</span>
+  <span class="kwa">begin</span>
+    count := flip;
+    <span class="slc">// Check if the number of reverse is the max</span>
+    <span class="kwc">if</span> (count &gt; maxCount) <span class="kwc">then</span>
+      maxCount := count;
+    <span class="slc">// Compute checksum</span>
+    checksum := count - checksum;
+    <span class="slc">// Swap</span>
+    <span class="kwd">swap</span>(list[<span class="num">0</span>], list[<span class="num">1</span>]);
+    <span class="slc">// If needed, roll 3</span>
+    <span class="kwc">if</span> (f) <span class="kwc">then</span>
+    <span class="kwa">begin</span>
+      <span class="slc">// Roll 3</span>
+      <span class="kwd">roll3</span>(list[<span class="num">0</span>], list[<span class="num">1</span>], list[<span class="num">2</span>]);
+      k := <span class="num">3</span>;
+      <span class="kwd">Dec</span>(counters[<span class="num">3</span>]);
+      <span class="slc">// If needed, roll next</span>
+      <span class="kwc">while</span> ((counters[k] = <span class="num">0</span>)) <span class="kwc">do</span>
+      <span class="kwa">begin</span>
+        counters[k] := limits[k];
+        <span class="kwd">roll</span>(k);
+        <span class="kwd">Inc</span>(k);
+        <span class="kwd">Dec</span>(counters[k]);
+      <span class="kwa">end</span>;
+    <span class="kwa">end</span>;
+    f := <span class="kwa">not</span> f;
+  <span class="kwa">end</span>;
+  <span class="kwd">threadData</span>(p^).checksum := checksum;
+  <span class="kwd">threadData</span>(p^).count := maxCount;
+  run := <span class="num">0</span>;
+<span class="kwa">end</span>;
+
+<span class="com">(* Main routine, to launch threads *)</span>
+<span class="kwa">procedure</span> <span class="kwd">launch</span>(n : <span class="kwb">longint</span>);
+<span class="kwa">var</span>
+  <span class="slc">//start, finish : TDateTime;</span>
+  list, counters, limits : arrWord;
+  i, l, num, count, checksum : <span class="kwb">longint</span>;
+  tt : <span class="kwa">array of</span> TThreadID;
+  td : <span class="kwa">array of</span> threadData;
+
+  <span class="slc">// Roll function</span>
+  <span class="kwa">procedure</span> <span class="kwd">roll</span>(k : <span class="kwb">longint</span>); <span class="kwa">inline</span>;
+  <span class="kwa">var</span>
+    j : <span class="kwb">longint</span>;
+  <span class="kwa">begin</span>
+    l := list[<span class="num">0</span>];
+    <span class="kwc">for</span> j := <span class="num">0</span> <span class="kwc">to</span> k <span class="kwc">do</span>
+      list[j] := list[j + <span class="num">1</span>];
+    list[j] := l;
+  <span class="kwa">end</span>;
+
+<span class="kwa">begin</span>
+  <span class="slc">/// start := now;</span>
+  <span class="kwd">SetLength</span>(tt, n);
+  <span class="kwd">SetLength</span>(td, n);
+  <span class="slc">// Inits the arrays</span>
+  num := <span class="num">1</span>;
+  <span class="kwc">for</span> i := <span class="num">0</span> <span class="kwc">to</span> n - <span class="num">1</span> <span class="kwc">do</span>
+  <span class="kwa">begin</span>
+    limits[i] := i;
+    counters[i] := i;
+    list[i] := i + <span class="num">1</span>;
+    num := num * (i + <span class="num">1</span>);
+  <span class="kwa">end</span>;
+  num := num <span class="kwa">div</span> n;
+  <span class="slc">// Launch threads</span>
+  <span class="kwc">for</span> i := <span class="num">0</span> <span class="kwc">to</span> n - <span class="num">1</span> <span class="kwc">do</span>
+  <span class="kwa">begin</span>
+    td[i].n := n;
+    td[i].num := num;
+    td[i].list := list;
+    td[i].counters := counters;
+    td[i].limits := limits;
+    tt[i] := <span class="kwd">BeginThread</span>(&#64;run, &#64;td[i]);
+    <span class="kwd">roll</span>(n - <span class="num">1</span>);
+  <span class="kwa">end</span>;
+  <span class="slc">// Wait threads</span>
+  checksum := <span class="num">0</span>;
+  count := <span class="num">0</span>;
+  <span class="kwc">for</span> i := <span class="num">0</span> <span class="kwc">to</span> n - <span class="num">1</span> <span class="kwc">do</span>
+  <span class="kwa">begin</span>
+    <span class="kwd">WaitForThreadTerminate</span>(tt[i], <span class="num">0</span>);
+    count := <span class="kwd">max</span>(count, td[i].count);
+    <span class="kwc">if</span> ((n <span class="kwa">and</span> <span class="num">1</span>) = <span class="num">0</span>) <span class="kwc">then</span>
+      checksum := td[i].checksum + checksum
+    <span class="kwc">else</span>
+      checksum := checksum - td[i].checksum;
+  <span class="kwa">end</span>;
+  <span class="slc">/// finish := now;</span>
+  <span class="slc">/// WriteLn(&apos;Time : &apos;, (MilliSecondsBetween(start, finish) / 1000) : 0 : 4);</span>
+  <span class="kwd">WriteLn</span>(<span class="kwd">abs</span>(checksum));
+  <span class="kwd">WriteLn</span>(<span class="str">&apos;Pfannkuchen(&apos;</span>, n, <span class="str">&apos;) = &apos;</span>, count);
+<span class="kwa">end</span>;
+
+<span class="com">(* Main program *)</span>
+<span class="kwa">begin</span>
+  <span class="kwc">if</span> (argc &gt; <span class="num">1</span>) <span class="kwc">then</span>
+    <span class="kwd">launch</span>(<span class="kwd">StrToInt</span>(argv[<span class="num">1</span>]))
+  <span class="kwc">else</span>
+    <span class="kwd">launch</span>(<span class="num">4</span>);
+<span class="kwa">end</span>.
+
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+Free Pascal Compiler
+version 3.2.2 [2021/05/16]
+
+
+Mon, 10 Jan 2022 02:03:49 GMT
+
+MAKE:
+mv fannkuchredux.fpascal fannkuchredux.pas
+/opt/src/fpc-3.2.2/bin/fpc -FuInclude/fpascal -XXs -O3 -Ci- -Cr- -g- -CpCOREAVX -CfAVX -Tlinux  -oFPASCAL_RUN fannkuchredux.pas
+Free Pascal Compiler version 3.2.2 [2021/05/16] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Linux for x86-64
+Compiling fannkuchredux.pas
+fannkuchredux.pas(99,14) Warning: Local variable &quot;list&quot; does not seem to be initialized
+fannkuchredux.pas(83,10) Warning: Local variable &quot;j&quot; does not seem to be initialized
+fannkuchredux.pas(173,5) Warning: Local variable &quot;list&quot; does not seem to be initialized
+fannkuchredux.pas(171,21) Warning: Local variable &quot;limits&quot; does not seem to be initialized
+fannkuchredux.pas(170,23) Warning: Local variable &quot;counters&quot; does not seem to be initialized
+fannkuchredux.pas(169,19) Warning: Local variable &quot;list&quot; does not seem to be initialized
+fannkuchredux.pas(147,10) Warning: Local variable &quot;j&quot; does not seem to be initialized
+Linking FPASCAL_RUN
+200 lines compiled, 0.8 sec
+7 warning(s) issued
+mv FPASCAL_RUN fannkuchredux.fpascal_run
+rm fannkuchredux.pas
+
+1.14s to complete and log all make actions
+
+COMMAND LINE:
+./fannkuchredux.fpascal_run 12
+
+PROGRAM OUTPUT:
+3968050
+Pfannkuchen(12) = 65
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

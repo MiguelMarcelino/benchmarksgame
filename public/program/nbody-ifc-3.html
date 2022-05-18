@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>n-body Classic Fortran&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>n-body Classic Fortran&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/nbody.html#nbody">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">! The Computer Language Benchmarks Game</span>
+<span class="slc">! https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">!</span>
+<span class="slc">!   Translated from Mark C. Lewis nbody.java by Simon Geard</span>
+<span class="slc">!   Revised by Mike Garrahan</span>
+<span class="slc">!</span>
+<span class="slc">! ifort -O3 -xHost -o nbody nbody.f90</span>
+<span class="slc">!</span>
+
+<span class="kwa">program</span> nbody
+  <span class="kwa">implicit none</span>
+  <span class="kwa">integer</span>, <span class="kwa">parameter</span> :: dp = <span class="kwd">selected_real_kind</span>(<span class="num">15</span>, <span class="num">307</span>)
+
+  <span class="kwa">real</span>(dp), <span class="kwa">parameter</span> :: TSTEP = <span class="num">0.01d0</span>
+  <span class="kwa">real</span>(dp), <span class="kwa">parameter</span> :: PI = <span class="num">3.141592653589793d0</span>
+  <span class="kwa">real</span>(dp), <span class="kwa">parameter</span> :: SOLAR_MASS = <span class="num">4</span> * PI * PI
+  <span class="kwa">real</span>(dp), <span class="kwa">parameter</span> :: DAYS_PER_YEAR = <span class="num">365.24d0</span>
+
+  <span class="kwa">integer</span>, <span class="kwa">parameter</span> :: NB = <span class="num">5</span>
+  <span class="kwa">integer</span>, <span class="kwa">parameter</span> :: NPAIR = NB * (NB - <span class="num">1</span>) / <span class="num">2</span>
+
+  <span class="kwa">real</span>(dp) :: <span class="kwd">x</span>(<span class="num">3</span>,NB), <span class="kwd">v</span>(<span class="num">3</span>,NB), <span class="kwd">mass</span>(NB)
+  <span class="kwa">real</span>(dp) :: e
+
+  <span class="kwa">integer</span> :: nstep, i
+  <span class="kwa">character</span>(len=<span class="num">8</span>) :: argv
+
+  <span class="kwa">call</span> <span class="kwd">getarg</span>(<span class="num">1</span>, argv)
+  <span class="kwa">read</span> (argv,*) nstep
+
+  <span class="kwa">call</span> <span class="kwd">init</span>(x, v, mass)
+
+  e = <span class="kwd">energy</span>(x, v, mass)
+  <span class="kwa">write</span> (*,<span class="str">&apos;(f12.9)&apos;</span>) e
+
+  <span class="kwa">do</span> i = <span class="num">1</span>, nstep
+     <span class="kwa">call</span> <span class="kwd">advance</span>(x, v, mass)
+  <span class="kwa">end do</span>
+
+  e = <span class="kwd">energy</span>(x, v, mass)
+  <span class="kwa">write</span> (*,<span class="str">&apos;(f12.9)&apos;</span>) e
+
+<span class="kwa">contains</span>
+
+  <span class="kwa">subroutine</span> <span class="kwd">advance</span>(x, v, mass)
+    <span class="kwa">real</span>(dp), <span class="kwd">intent</span>(inout) :: <span class="kwd">x</span>(<span class="num">3</span>,NB), <span class="kwd">v</span>(<span class="num">3</span>,NB)
+    <span class="kwa">real</span>(dp), <span class="kwd">intent</span>(in) :: <span class="kwd">mass</span>(NB)
+
+    <span class="kwa">real</span>(dp) :: <span class="kwd">r</span>(<span class="num">3</span>,NPAIR), <span class="kwd">rmag</span>(<span class="num">3</span>)
+    <span class="kwa">real</span>(dp) :: <span class="kwd">distance</span>(NPAIR), <span class="kwd">mag</span>(NPAIR)
+    <span class="kwa">integer</span> :: i, j, k
+
+    k = <span class="num">1</span>
+    <span class="kwa">do</span> i = <span class="num">1</span>, NB - <span class="num">1</span>
+       <span class="kwa">do</span> j = i + <span class="num">1</span>, NB
+          <span class="kwd">r</span>(:,k) = <span class="kwd">x</span>(:,i) - <span class="kwd">x</span>(:,j)
+          k = k + <span class="num">1</span>
+       <span class="kwa">end do</span>
+    <span class="kwa">end do</span>
+
+    distance = <span class="kwd">sqrt</span>(<span class="kwd">sum</span>(r**<span class="num">2</span>, dim=<span class="num">1</span>))
+    mag = TSTEP / distance**<span class="num">3</span>
+
+    k = <span class="num">1</span>
+    <span class="kwa">do</span> i = <span class="num">1</span>, NB - <span class="num">1</span>
+       <span class="kwa">do</span> j = i + <span class="num">1</span>, NB
+          rmag = <span class="kwd">mag</span>(k) * <span class="kwd">r</span>(:,k)
+          <span class="kwd">v</span>(:,i) = <span class="kwd">v</span>(:,i) - <span class="kwd">mass</span>(j) * rmag
+          <span class="kwd">v</span>(:,j) = <span class="kwd">v</span>(:,j) + <span class="kwd">mass</span>(i) * rmag
+          k = k + <span class="num">1</span>
+       <span class="kwa">end do</span>
+    <span class="kwa">end do</span>
+
+    x = x + TSTEP * v
+  <span class="kwa">end subroutine</span> advance
+
+  <span class="kwa">function</span> <span class="kwd">energy</span>(x, v, mass)
+    <span class="kwa">real</span>(dp) :: energy
+    <span class="kwa">real</span>(dp), <span class="kwd">intent</span>(in) :: <span class="kwd">x</span>(<span class="num">3</span>,NB), <span class="kwd">v</span>(<span class="num">3</span>,NB), <span class="kwd">mass</span>(NB)
+
+    <span class="kwa">real</span>(dp) :: <span class="kwd">r</span>(<span class="num">3</span>), distance, ke, pe
+    <span class="kwa">integer</span> :: i, j
+
+    ke = <span class="num">0.5d0</span> * <span class="kwd">dot_product</span>(mass, <span class="kwd">sum</span>(v**<span class="num">2</span>, dim=<span class="num">1</span>))
+    pe = <span class="num">0.0d0</span>
+    <span class="kwa">do</span> i = <span class="num">1</span>, NB - <span class="num">1</span>
+       <span class="kwa">do</span> j = i + <span class="num">1</span>, NB
+          r = <span class="kwd">x</span>(:,i) - <span class="kwd">x</span>(:,j)
+          distance = <span class="kwd">sqrt</span>(<span class="kwd">sum</span>(r**<span class="num">2</span>))
+          pe = pe - <span class="kwd">mass</span>(i) * <span class="kwd">mass</span>(j) / distance
+       <span class="kwa">end do</span>
+    <span class="kwa">end do</span>
+    energy = ke + pe
+  <span class="kwa">end function</span> energy
+
+  <span class="kwa">subroutine</span> <span class="kwd">init</span>(x, v, mass)
+    <span class="kwa">real</span>(dp), <span class="kwd">intent</span>(out) :: <span class="kwd">x</span>(<span class="num">3</span>,NB), <span class="kwd">v</span>(<span class="num">3</span>,NB), <span class="kwd">mass</span>(NB)
+    <span class="kwa">integer</span>, <span class="kwa">parameter</span> :: SUN = <span class="num">1</span>, JUPITER = <span class="num">2</span>, SATURN = <span class="num">3</span>, &amp;
+         URANUS = <span class="num">4</span>, NEPTUNE = <span class="num">5</span>
+    <span class="kwa">real</span>(dp) :: <span class="kwd">momentum</span>(<span class="num">3</span>)
+
+    <span class="kwd">x</span>(:,JUPITER) = (/ &amp;
+         <span class="num">4.84143144246472090d</span>+<span class="num">00</span>, &amp;
+        -<span class="num">1.16032004402742839d</span>+<span class="num">00</span>, &amp;
+        -<span class="num">1.03622044471123109d</span>-<span class="num">01</span> /)
+    <span class="kwd">v</span>(:,JUPITER) = (/ &amp;
+         <span class="num">1.66007664274403694d</span>-<span class="num">03</span>, &amp;
+         <span class="num">7.69901118419740425d</span>-<span class="num">03</span>, &amp;
+        -<span class="num">6.90460016972063023d</span>-<span class="num">05</span> /)
+    <span class="kwd">mass</span>(JUPITER) = &amp;
+         <span class="num">9.54791938424326609d</span>-<span class="num">04</span>
+
+    <span class="kwd">x</span>(:,SATURN) = (/ &amp;
+         <span class="num">8.34336671824457987d</span>+<span class="num">00</span>, &amp;
+         <span class="num">4.12479856412430479d</span>+<span class="num">00</span>, &amp;
+        -<span class="num">4.03523417114321381d</span>-<span class="num">01</span> /)
+    <span class="kwd">v</span>(:,SATURN) = (/ &amp;
+        -<span class="num">2.76742510726862411d</span>-<span class="num">03</span>, &amp;
+         <span class="num">4.99852801234917238d</span>-<span class="num">03</span>, &amp;
+         <span class="num">2.30417297573763929d</span>-<span class="num">05</span> /)
+    <span class="kwd">mass</span>(SATURN) = &amp;
+         <span class="num">2.85885980666130812d</span>-<span class="num">04</span>
+
+    <span class="kwd">x</span>(:,URANUS) = (/ &amp;
+         <span class="num">1.28943695621391310d</span>+<span class="num">01</span>, &amp;
+        -<span class="num">1.51111514016986312d</span>+<span class="num">01</span>, &amp;
+        -<span class="num">2.23307578892655734d</span>-<span class="num">01</span> /)
+    <span class="kwd">v</span>(:,URANUS) = (/ &amp;
+         <span class="num">2.96460137564761618d</span>-<span class="num">03</span>, &amp;
+         <span class="num">2.37847173959480950d</span>-<span class="num">03</span>, &amp;
+        -<span class="num">2.96589568540237556d</span>-<span class="num">05</span> /)
+    <span class="kwd">mass</span>(URANUS) = &amp;
+         <span class="num">4.36624404335156298d</span>-<span class="num">05</span>
+
+    <span class="kwd">x</span>(:,NEPTUNE) = (/ &amp;
+         <span class="num">1.53796971148509165d</span>+<span class="num">01</span>, &amp;
+        -<span class="num">2.59193146099879641d</span>+<span class="num">01</span>, &amp;
+         <span class="num">1.79258772950371181d</span>-<span class="num">01</span> /)
+    <span class="kwd">v</span>(:,NEPTUNE) = (/ &amp;
+         <span class="num">2.68067772490389322d</span>-<span class="num">03</span>, &amp;
+         <span class="num">1.62824170038242295d</span>-<span class="num">03</span>, &amp;
+        -<span class="num">9.51592254519715870d</span>-<span class="num">05</span> /)
+    <span class="kwd">mass</span>(NEPTUNE) = &amp;
+         <span class="num">5.15138902046611451d</span>-<span class="num">05</span>
+
+    <span class="kwd">x</span>(:,SUN) = <span class="num">0.0d0</span>
+    <span class="kwd">v</span>(:,SUN) = <span class="num">0.0d0</span>
+    <span class="kwd">mass</span>(SUN) = <span class="num">1.0d0</span>
+
+    v = v * DAYS_PER_YEAR
+    mass = mass * SOLAR_MASS
+
+    momentum = <span class="kwd">matmul</span>(v, mass)
+    <span class="kwd">v</span>(:,SUN) = <span class="kwd">v</span>(:,SUN) - momentum / <span class="kwd">mass</span>(SUN)
+  <span class="kwa">end subroutine</span> init
+
+<span class="kwa">end program</span> nbody
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+Fortran Intel(R) 64 Classic
+Version 2021.5.0
+Build 20211109_000000
+
+
+Fri, 25 Feb 2022 01:59:19 GMT
+
+MAKE:
+mv nbody.ifc-3.ifc nbody.ifc-3.f90
+~/intel/oneapi/compiler/2022.0.1/linux/bin/intel64/ifort -O3 -march=ivybridge -ipo -static nbody.ifc-3.f90 -o nbody.ifc-3.ifc_run
+ipo: warning #11021: unresolved __ehdr_start
+        Referenced in libc.a(libc-start.o)
+rm nbody.ifc-3.f90
+
+3.70s to complete and log all make actions
+
+COMMAND LINE:
+./nbody.ifc-3.ifc_run 50000000
+
+PROGRAM OUTPUT:
+-0.169075164
+-0.169059907
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

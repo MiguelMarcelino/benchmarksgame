@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide Haskell GHC&nbsp;#2 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide Haskell GHC&nbsp;#2 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">-- The Computer Language Benchmarks Game</span>
+<span class="slc">-- https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">--</span>
+<span class="slc">-- Contributed by cahu ette</span>
+
+
+<span class="kwd">module</span> Main <span class="kwd">where</span>
+
+<span class="kwd">import</span> Data.Bits
+<span class="kwd">import</span> Data.List
+<span class="kwd">import</span> Data.Word
+<span class="kwd">import</span> Data.Hashable
+<span class="kwd">import</span> Data.Traversable
+<span class="kwd">import</span> Text.Printf
+
+<span class="kwd">import</span> Data.STRef
+<span class="kwd">import</span> Control.Monad
+<span class="kwd">import</span> Control.Monad.ST
+<span class="kwd">import</span> Control.Parallel.Strategies
+
+
+<span class="kwd">import qualified</span> Data.Map.Strict           <span class="kwd">as</span> M
+<span class="kwd">import qualified</span> Data.HashTable.Class      <span class="kwd">as</span> HC
+<span class="kwd">import qualified</span> Data.HashTable.ST.Basic   <span class="kwd">as</span> H
+<span class="kwd">import qualified</span> Data.ByteString.Char8     <span class="kwd">as</span> B
+
+
+<span class="kwd">type</span> HashTable s k v = H.HashTable s k v
+
+
+<span class="com">{- By using only 2 bits to encode keys, it&apos;s important to use a different table</span>
+<span class="com"> - for different key sizes. Otherwise, if we encode &apos;A&apos; as 0x00, &quot;AT&quot; and</span>
+<span class="com"> - &quot;AAT&quot; would map to the same bucket in the table.</span>
+<span class="com"> -</span>
+<span class="com"> - We could use 3 bits per letter to avoid this problem if needed.</span>
+<span class="com"> -}</span>
+bitsForChar :: <span class="kwb">Char</span> -&gt; Word64
+bitsForChar &apos;a&apos; = <span class="num">0</span>
+bitsForChar &apos;A&apos; = <span class="num">0</span>
+bitsForChar &apos;c&apos; = <span class="num">1</span>
+bitsForChar &apos;C&apos; = <span class="num">1</span>
+bitsForChar &apos;g&apos; = <span class="num">2</span>
+bitsForChar &apos;G&apos; = <span class="num">2</span>
+bitsForChar &apos;t&apos; = <span class="num">3</span>
+bitsForChar &apos;T&apos; = <span class="num">3</span>
+bitsForChar _   = <span class="kwc">error</span> <span class="str">&quot;Ay, Caramba!&quot;</span>
+
+
+charForBits :: Word64 -&gt; <span class="kwb">Char</span>
+charForBits <span class="num">0</span> = &apos;A&apos;
+charForBits <span class="num">1</span> = &apos;C&apos;
+charForBits <span class="num">2</span> = &apos;G&apos;
+charForBits <span class="num">3</span> = &apos;T&apos;
+charForBits _ = <span class="kwc">error</span> <span class="str">&quot;Ay, Caramba!&quot;</span>
+
+
+packKey :: B.ByteString -&gt; Word64
+packKey = go zeroBits
+  <span class="kwd">where</span>
+    go k bs = <span class="kwd">case</span> B.uncons bs <span class="kwd">of</span>
+        Nothing      -&gt; k
+        Just (c, cs) -&gt; go (unsafeShiftL k <span class="num">2</span> .|. bitsForChar c) cs
+<span class="com">{-# INLINE packKey #-}</span>
+
+unpackKey :: <span class="kwb">Int</span> -&gt; Word64 -&gt; B.ByteString
+unpackKey = go []
+  <span class="kwd">where</span>
+    go s <span class="num">0</span> _ = B.pack s
+    go s l i = go (charForBits (i .&amp;. <span class="num">3</span>) : s) (l-<span class="num">1</span>) (unsafeShiftR i <span class="num">2</span>)
+<span class="com">{-# INLINE unpackKey #-}</span>
+
+
+updateTable :: (Eq k, Hashable k)
+            =&gt; HashTable s k (STRef s <span class="kwb">Int</span>)
+            -&gt; (<span class="kwb">Int</span> -&gt; <span class="kwb">Int</span>)
+            -&gt; k
+            -&gt; ST s ()
+updateTable t f k = <span class="kwd">do</span>
+    mv &lt;- H.<span class="kwc">lookup</span> t k
+    <span class="kwd">case</span> mv <span class="kwd">of</span>
+        Nothing -&gt; newSTRef <span class="num">1</span> &gt;&gt;= H.<span class="kwc">insert</span> t k
+        Just v  -&gt; modifySTRef&apos; v f
+<span class="com">{-# INLINE updateTable #-}</span>
+
+
+getVal :: (Eq k, Hashable k)
+       =&gt; HashTable s k (STRef s <span class="kwb">Int</span>)
+       -&gt; k
+       -&gt; ST s <span class="kwb">Int</span>
+getVal t k = <span class="kwd">do</span>
+    mv &lt;- H.<span class="kwc">lookup</span> t k
+    <span class="kwd">case</span> mv <span class="kwd">of</span> Nothing -&gt; <span class="kwc">return</span> <span class="num">0</span>
+               Just sv -&gt; readSTRef sv
+<span class="slc">--{-# INLINE getVal #-}</span>
+
+
+tableToList :: HashTable s k (STRef s a) -&gt; ST s [(k, a)]
+tableToList t = <span class="kwd">do</span>
+    pairs &lt;- HC.toList t
+    forM pairs $ \(k, v) -&gt; <span class="kwd">do</span>
+        a &lt;- readSTRef v
+        <span class="kwc">return</span> (k, a)
+
+
+countOccurrences :: <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; B.ByteString -&gt; ST s (HashTable s Word64 (STRef s <span class="kwb">Int</span>))
+countOccurrences jumpSize frameSize input = <span class="kwd">do</span>
+    t &lt;- H.new
+
+    <span class="kwd">let</span> go bs = <span class="kwc">unless</span> (B.<span class="kwa">length</span> bs &lt; frameSize) $ <span class="kwd">do</span>
+            <span class="kwd">let</span> k = takeFrame bs
+            updateTable t (+<span class="num">1</span>) (packKey k)
+            go (nextFrame bs)
+
+    go input
+    <span class="kwc">return</span> t
+
+  <span class="kwd">where</span>
+    takeFrame = B.<span class="kwc">take</span> frameSize
+    nextFrame = B.<span class="kwc">drop</span> jumpSize
+
+
+extractSequence :: <span class="kwb">String</span> -&gt; B.ByteString -&gt; B.ByteString
+extractSequence s = findSeq
+  <span class="kwd">where</span>
+    prefix = B.pack (&apos;&gt;&apos; : s)
+    skipSeq =
+          B.<span class="kwc">dropWhile</span> (/= &apos;&gt;&apos;)
+        . B.<span class="kwc">drop</span> <span class="num">1</span>
+    takeSeq =
+          B.<span class="kwc">filter</span>    (/= &apos;<span class="esc">\n</span>&apos;)
+        . B.<span class="kwc">takeWhile</span> (/=  &apos;&gt;&apos;) <span class="slc">-- extract until next header</span>
+        . B.<span class="kwc">dropWhile</span> (/= &apos;<span class="esc">\n</span>&apos;) <span class="slc">-- skip header</span>
+    findSeq str
+        | prefix `B.<span class="kwc">isPrefixOf</span>` str  =  takeSeq str
+        | <span class="kwc">otherwise</span>                  =  findSeq (skipSeq str)
+
+
+
+main :: <span class="kwb">IO</span> ()
+main = <span class="kwd">do</span>
+    s &lt;- extractSequence <span class="str">&quot;THREE&quot;</span> &lt;$&gt; B.<span class="kwc">getContents</span>
+
+    <span class="kwd">let</span> keys    = [<span class="str">&quot;GGT&quot;</span>,<span class="str">&quot;GGTA&quot;</span>,<span class="str">&quot;GGTATT&quot;</span>,<span class="str">&quot;GGTATTTTAATT&quot;</span>,<span class="str">&quot;GGTATTTTAATTTATAGT&quot;</span>]
+    <span class="kwd">let</span> threads = [<span class="num">0</span> .. <span class="num">63</span>]
+
+    <span class="kwd">let</span> threadWorkOcc key tid = runST $ <span class="kwd">do</span>
+            t &lt;- countOccurrences (<span class="kwa">length</span> threads) (B.<span class="kwa">length</span> key) (B.<span class="kwc">drop</span> tid s)
+            getVal t (packKey key)
+
+    <span class="kwd">let</span> calcOcc key = <span class="kwa">sum</span> $ runEval $
+            <span class="kwc">mapM</span> (rpar . threadWorkOcc (B.pack key)) threads
+
+    <span class="kwd">let</span> threadWorkFreq len tid = runST $ <span class="kwd">do</span>
+            t  &lt;- countOccurrences (<span class="kwa">length</span> threads) len (B.<span class="kwc">drop</span> tid s)
+            vs &lt;- tableToList t
+            <span class="kwc">return</span> $ <span class="kwc">map</span> (\(k, v) -&gt; (B.unpack (unpackKey len k), freq v)) vs
+          <span class="kwd">where</span>
+            freq v = <span class="num">100</span> * <span class="kwc">fromIntegral</span> v / <span class="kwc">fromIntegral</span> (B.<span class="kwa">length</span> s - len + <span class="num">1</span>)
+
+    <span class="kwd">let</span> calcFreq len =
+            <span class="kwd">let</span> l = <span class="kwc">concat</span> $ runEval $ <span class="kwc">mapM</span> (rpar . threadWorkFreq len) threads
+                m = <span class="kwc">foldr</span> (<span class="kwc">uncurry</span> $ M.insertWith (+)) M.<span class="kwa">empty</span> l
+            <span class="kwd">in</span>
+                M.toList m
+
+    <span class="kwd">let</span> resultsOcc = <span class="kwc">map</span> (\k -&gt; (k, calcOcc k)) keys
+
+    printFreq (calcFreq <span class="num">1</span>)
+    <span class="kwc">putStrLn</span> <span class="str">&quot;&quot;</span>
+    printFreq (calcFreq <span class="num">2</span>)
+    <span class="kwc">putStrLn</span> <span class="str">&quot;&quot;</span>
+    forM_ resultsOcc $ \(k, r) -&gt; printf <span class="str">&quot;</span><span class="ipl">%d</span><span class="str"></span><span class="esc">\t</span><span class="str"></span><span class="ipl">%s</span><span class="str"></span><span class="esc">\n</span><span class="str">&quot;</span> r k
+
+  <span class="kwd">where</span>
+
+    sortFreq = <span class="kwc">sortBy</span>
+        (\ (k :: <span class="kwb">String</span>, v :: <span class="kwb">Double</span>) (k&apos;, v&apos;) -&gt;
+            (<span class="kwc">compare</span> v&apos; v) `mappend` (<span class="kwc">compare</span> k k&apos;))
+
+    printFreq :: [(<span class="kwb">String</span>, <span class="kwb">Double</span>)] -&gt; <span class="kwb">IO</span> ()
+    printFreq l = forM_ (sortFreq l) $ <span class="kwc">uncurry</span> (printf <span class="str">&quot;</span><span class="ipl">%s</span> <span class="str">%.3f</span><span class="esc">\n</span><span class="str">&quot;</span>)
+        
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+The Glorious Glasgow Haskell
+Compilation System,
+version 9.2.1
+
+
+Tue, 25 Jan 2022 18:00:00 GMT
+
+MAKE:
+mv knucleotide.ghc-2.ghc knucleotide.ghc-2.hs
+~/.ghcup/ghc/9.2.1/bin/ghc --make -fllvm -O2 -XBangPatterns -threaded -rtsopts -funbox-strict-fields -XBinaryLiterals -XDerivingStrategies -XGeneralizedNewtypeDeriving -XOverloadedStrings -XScopedTypeVariables -XTypeApplications knucleotide.ghc-2.hs -o knucleotide.ghc-2.ghc_run
+[1 of 1] Compiling Main             ( knucleotide.ghc-2.hs, knucleotide.ghc-2.o )
+Linking knucleotide.ghc-2.ghc_run ...
+rm knucleotide.ghc-2.hs
+
+15.26s to complete and log all make actions
+
+COMMAND LINE:
+./knucleotide.ghc-2.ghc_run +RTS -N4 -K2048M -RTS 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide Haskell GHC&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide Haskell GHC&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">-- The Computer Language Benchmarks Game</span>
+<span class="slc">-- https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">--</span>
+<span class="slc">-- Inspired by version contributed by Branimir Maksimovic</span>
+<span class="slc">-- Updated by Callan McGill:</span>
+<span class="slc">--   - to use hashmap from unordered containers</span>
+<span class="slc">--   - bit encoding of &apos;a&apos;, &apos;c&apos;, &apos;g&apos;, &apos;t&apos;</span>
+<span class="slc">--   - Vector streaming framework to re-write algorithm</span>
+<span class="slc">-- Fix mixup of order in 2-sequences by Artem Pelenitsyn</span>
+
+<span class="kwd">module</span> Main <span class="kwd">where</span>
+
+<span class="kwd">import qualified</span> Control.Concurrent.ParallelIO.Global <span class="kwd">as</span> ParallelIO
+<span class="kwd">import</span>           Data.Bits
+<span class="kwd">import</span>           Data.ByteString                      (ByteString)
+<span class="kwd">import qualified</span> Data.ByteString                      <span class="kwd">as</span> ByteString
+<span class="kwd">import qualified</span> Data.ByteString.Char8                <span class="kwd">as</span> Char8
+<span class="kwd">import</span>           Data.ByteString.Internal             (toForeignPtr)
+<span class="kwd">import</span>           Data.Coerce
+<span class="kwd">import</span>           Data.Hashable
+<span class="kwd">import qualified</span> Data.HashMap.Internal                <span class="kwd">as</span> Internal
+<span class="kwd">import</span>           Data.HashMap.Strict                  (HashMap)
+<span class="kwd">import qualified</span> Data.HashMap.Strict                  <span class="kwd">as</span> HashMap
+<span class="kwd">import</span>           Data.List                            (<span class="kwc">foldl</span>&apos;)
+<span class="kwd">import</span>           Data.Primitive.PVar
+<span class="kwd">import qualified</span> Data.Vector                          <span class="kwd">as</span> Vector
+<span class="kwd">import qualified</span> Data.Vector.Algorithms.Intro         <span class="kwd">as</span> Sort
+<span class="kwd">import</span>           Data.Vector.Fusion.Stream.Monadic    (Step (..), Stream (..))
+<span class="kwd">import qualified</span> Data.Vector.Fusion.Stream.Monadic    <span class="kwd">as</span> Stream
+<span class="kwd">import qualified</span> Data.Vector.Storable                 <span class="kwd">as</span> Storable
+<span class="kwd">import</span>           Foreign.Ptr                          (castPtr, plusPtr)
+<span class="kwd">import</span>           GHC.Word
+<span class="kwd">import qualified</span> Text.Builder                         <span class="kwd">as</span> Builder
+
+
+main :: <span class="kwb">IO</span> ()
+main = <span class="kwd">do</span>
+  <span class="kwd">let</span>
+    skip = <span class="kwd">do</span>
+      l &lt;- ByteString.<span class="kwc">getLine</span>
+      <span class="kwd">if</span> Char8.<span class="kwc">isPrefixOf</span> <span class="str">&quot;&gt;THREE&quot;</span> l
+          <span class="kwd">then</span> <span class="kwc">return</span> ()
+          <span class="kwd">else</span> skip
+  skip
+  s &lt;- ByteString.<span class="kwc">getContents</span>
+  <span class="kwd">let</span> sv = byteStringToVector s
+  <span class="kwd">let</span>
+    content =
+     <span class="slc">-- Remove newlines and only keep the second and third</span>
+     <span class="slc">-- bit of each character as in many of the faster solutions.</span>
+        Storable.<span class="kwc">map</span> (<span class="esc">\b</span> -&gt; (b .&amp;. <span class="num">0</span>b110) `shiftR` <span class="num">1</span>)
+      . Storable.<span class="kwc">filter</span> (/= <span class="num">10</span>) $ sv
+  <span class="slc">-- return results in parallel.</span>
+  results &lt;- ParallelIO.parallel (actions content)
+  <span class="slc">-- Put builder results to stdout.</span>
+  Builder.putToStdOut (<span class="kwc">foldl</span>&apos; (&lt;&gt;) mempty results)
+
+<span class="com">{-# inline actions #-}</span>
+<span class="slc">-- Tasks to be run in parallel.</span>
+actions :: Storable.Vector Word8 -&gt; [<span class="kwb">IO</span> Builder.Builder]
+actions content =
+  [ writeFrequencies1 content
+  , writeFrequencies2 content
+  , writeCount content <span class="str">&quot;GGT&quot;</span>
+  , writeCount content <span class="str">&quot;GGTA&quot;</span>
+  , writeCount content <span class="str">&quot;GGTATT&quot;</span>
+  , writeCount content <span class="str">&quot;GGTATTTTAATT&quot;</span>
+  , writeCount content <span class="str">&quot;GGTATTTTAATTTATAGT&quot;</span>
+  ]
+
+<span class="slc">-- Write the one-letter frequences into text builder.</span>
+writeFrequencies1 :: Storable.Vector Word8 -&gt; <span class="kwb">IO</span> Builder.Builder
+writeFrequencies1 input = <span class="kwd">do</span>
+    hm &lt;- calculate1B input
+    mv &lt;- Vector.unsafeThaw . Vector.fromList . HashMap.toList $ hm
+    Sort.<span class="kwc">sortBy</span> (\(_,x) (_,y) -&gt; y `<span class="kwc">compare</span>` x) mv
+    sorted :: Vector.Vector (Word8, <span class="kwb">Int</span>)  &lt;- Vector.unsafeFreeze $ mv
+    <span class="kwd">let</span>
+      inputLength :: <span class="kwb">Double</span>
+      inputLength = <span class="kwc">fromIntegral</span> (Storable.<span class="kwa">length</span> input)
+    <span class="kwd">let</span> b = Vector.<span class="kwc">foldl</span>&apos; (<span class="esc">\a</span>cc (k,v)-&gt;
+                      <span class="kwd">let</span>
+                        perc :: <span class="kwb">Double</span>
+                        perc = <span class="num">100</span> * (<span class="kwc">fromIntegral</span> v)/inputLength
+                      <span class="kwd">in</span>
+                          acc
+                       &lt;&gt; Builder.char (decode $ k)
+                       &lt;&gt; Builder.char &apos; &apos;
+                       &lt;&gt; Builder.fixedDouble <span class="num">3</span> perc
+                       &lt;&gt; Builder.char &apos;<span class="esc">\n</span>&apos;) mempty sorted
+    pure (b &lt;&gt; Builder.char &apos;<span class="esc">\n</span>&apos;)
+
+<span class="slc">-- Write the two-letter frequencies into text builder.</span>
+writeFrequencies2 :: Storable.Vector Word8 -&gt; <span class="kwb">IO</span> Builder.Builder
+writeFrequencies2 input = <span class="kwd">do</span>
+    hm &lt;- calculate2B input
+    mv &lt;- Vector.unsafeThaw . Vector.fromList . HashMap.toList $ hm
+    Sort.<span class="kwc">sortBy</span> (\(_,x) (_,y) -&gt; y `<span class="kwc">compare</span>` x) mv
+    sorted :: Vector.Vector (Word16, <span class="kwb">Int</span>)  &lt;- Vector.unsafeFreeze $ mv
+    <span class="kwd">let</span>
+      inputLength :: <span class="kwb">Double</span>
+      inputLength  = <span class="kwc">fromIntegral</span> (Storable.<span class="kwa">length</span> input) - <span class="num">1</span>
+    <span class="kwd">let</span> b = <span class="kwc">foldl</span>&apos; (<span class="esc">\a</span>cc (k,v)-&gt;
+                      <span class="kwd">let</span>
+                        perc :: <span class="kwb">Double</span>
+                        perc = <span class="num">100</span> * (<span class="kwc">fromIntegral</span> v)/inputLength
+                      <span class="kwd">in</span>
+                          acc
+                       &lt;&gt; decode16 k
+                       &lt;&gt; Builder.char &apos; &apos;
+                       &lt;&gt; Builder.fixedDouble <span class="num">3</span> perc
+                       &lt;&gt; Builder.char &apos;<span class="esc">\n</span>&apos;) mempty  sorted
+    pure (b &lt;&gt; Builder.char &apos;<span class="esc">\n</span>&apos;)
+
+<span class="slc">-- Convert byte back to letter.</span>
+decode :: Word8 -&gt; <span class="kwb">Char</span>
+decode <span class="num">0</span> = &apos;A&apos;
+decode <span class="num">1</span> = &apos;C&apos;
+decode <span class="num">2</span> = &apos;T&apos;
+decode <span class="num">3</span> = &apos;G&apos;
+decode _ = <span class="kwc">error</span> <span class="str">&quot;decode: encountered unexpected byte&quot;</span>
+
+<span class="slc">-- Convert pair of bytes back to pair of letters</span>
+decode16 :: Word16 -&gt; Builder.Builder
+decode16 <span class="num">0</span>b0000000000000000 = Builder.text <span class="str">&quot;AA&quot;</span>
+decode16 <span class="num">0</span>b0000000000000001 = Builder.text <span class="str">&quot;CA&quot;</span>
+decode16 <span class="num">0</span>b0000000000000010 = Builder.text <span class="str">&quot;TA&quot;</span>
+decode16 <span class="num">0</span>b0000000000000011 = Builder.text <span class="str">&quot;GA&quot;</span>
+decode16 <span class="num">0</span>b0000000100000000 = Builder.text <span class="str">&quot;AC&quot;</span>
+decode16 <span class="num">0</span>b0000000100000001 = Builder.text <span class="str">&quot;CC&quot;</span>
+decode16 <span class="num">0</span>b0000000100000010 = Builder.text <span class="str">&quot;TC&quot;</span>
+decode16 <span class="num">0</span>b0000000100000011 = Builder.text <span class="str">&quot;GC&quot;</span>
+decode16 <span class="num">0</span>b0000001000000000 = Builder.text <span class="str">&quot;AT&quot;</span>
+decode16 <span class="num">0</span>b0000001000000001 = Builder.text <span class="str">&quot;CT&quot;</span>
+decode16 <span class="num">0</span>b0000001000000010 = Builder.text <span class="str">&quot;TT&quot;</span>
+decode16 <span class="num">0</span>b0000001000000011 = Builder.text <span class="str">&quot;GT&quot;</span>
+decode16 <span class="num">0</span>b0000001100000000 = Builder.text <span class="str">&quot;AG&quot;</span>
+decode16 <span class="num">0</span>b0000001100000001 = Builder.text <span class="str">&quot;CG&quot;</span>
+decode16 <span class="num">0</span>b0000001100000010 = Builder.text <span class="str">&quot;TG&quot;</span>
+decode16 <span class="num">0</span>b0000001100000011 = Builder.text <span class="str">&quot;GG&quot;</span>
+decode16 n                  = <span class="kwc">error</span> $ <span class="str">&quot;decode16: unexpected bits: &quot;</span> &lt;&gt; <span class="kwc">show</span> n
+
+
+<span class="slc">-- Compute hashmap of single character occurences</span>
+calculate1B :: Storable.Vector Word8 -&gt; <span class="kwb">IO</span> (HashMap Word8 <span class="kwb">Int</span>)
+calculate1B input = Storable.<span class="kwc">foldM</span>&apos; updateMap HashMap.<span class="kwa">empty</span> input &gt;&gt;= traverse readPVar
+  <span class="kwd">where</span>
+    updateMap
+      :: HashMap Word8 (PVar <span class="kwb">Int</span> RW)
+      -&gt; Word8
+      -&gt; <span class="kwb">IO</span> (HashMap Word8 (PVar <span class="kwb">Int</span> RW))
+    updateMap freqmap word =
+         <span class="kwd">case</span> HashMap.<span class="kwc">lookup</span> word freqmap <span class="kwd">of</span>
+            Nothing -&gt;
+              <span class="kwd">do</span>
+                ref &lt;- newPVar <span class="num">1</span>
+                <span class="kwd">let</span>
+                  freqmap&apos;
+                  <span class="slc">-- Use insertNewKey as we know key is not present</span>
+                      = Internal.insertNewKey (<span class="kwc">fromIntegral</span> word) word ref freqmap
+                pure freqmap&apos;
+                   <span class="slc">-- Mutate reference over copying hashmap on insert.</span>
+            Just x -&gt; modifyPVar_ x (+<span class="num">1</span>) &gt;&gt; pure freqmap
+
+
+<span class="slc">-- Compute hashmap of two-character occurences.</span>
+calculate2B :: Storable.Vector Word8 -&gt; <span class="kwb">IO</span> (HashMap Word16 <span class="kwb">Int</span>)
+calculate2B input = fold16M updateMap HashMap.<span class="kwa">empty</span> input &gt;&gt;= traverse readPVar
+  <span class="kwd">where</span>
+    updateMap
+      :: HashMap Word16 (PVar <span class="kwb">Int</span> RW)
+      -&gt; Word16
+      -&gt; <span class="kwb">IO</span> (HashMap Word16 (PVar <span class="kwb">Int</span> RW))
+    updateMap freqmap word =
+         <span class="kwd">case</span> HashMap.<span class="kwc">lookup</span> word freqmap <span class="kwd">of</span>
+            Nothing -&gt;
+              <span class="kwd">do</span>
+                ref &lt;- newPVar <span class="num">1</span>
+                <span class="kwd">let</span>
+                  freqmap&apos;
+                  <span class="slc">-- Use insertNewKey as we know key is not present</span>
+                      = Internal.insertNewKey (<span class="kwc">fromIntegral</span> word) word ref freqmap
+                pure freqmap&apos;
+                   <span class="slc">-- Mutate reference over copying hashmap on insert.</span>
+            Just x -&gt; modifyPVar_ x (+<span class="num">1</span>) &gt;&gt; pure freqmap
+
+
+<span class="com">{-# INLINE writeCount #-}</span>
+<span class="slc">-- Write number of occurences of string in input.</span>
+writeCount :: Storable.Vector Word8 -&gt; ByteString -&gt; <span class="kwb">IO</span> Builder.Builder
+writeCount input <span class="kwa">string</span> = <span class="kwd">do</span>
+    <span class="kwd">let</span> size = Char8.<span class="kwa">length string</span>
+    <span class="kwd">let</span> stringV = byteStringToVector <span class="kwa">string</span>
+    <span class="kwd">let</span> encoded = Storable.<span class="kwc">map</span> (<span class="esc">\b</span> -&gt; (b .&amp;. <span class="num">0</span>b110) `shiftR` <span class="num">1</span>) $ stringV
+    hm &lt;- tcalculate input size
+    <span class="kwd">let</span>
+      v :: <span class="kwb">Int</span>
+      v = <span class="kwc">maybe</span> <span class="num">0</span> <span class="kwc">id</span> $ HashMap.<span class="kwc">lookup</span> (coerce encoded) hm
+    <span class="kwd">let</span> b = Builder.unsignedDecimal v &lt;&gt; Builder.char &apos;<span class="esc">\t</span>&apos; &lt;&gt; Builder.asciiByteString <span class="kwa">string</span>
+    pure (b &lt;&gt; Builder.char &apos;<span class="esc">\n</span>&apos;)
+
+<span class="slc">-- Compute hashmaps in parallel over given increment</span>
+<span class="slc">-- and then re-combine.</span>
+tcalculate :: Storable.Vector Word8 -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> (HashMap Incremental <span class="kwb">Int</span>)
+tcalculate input size = <span class="kwd">do</span>
+    <span class="kwd">let</span>
+      computeHashMaps = <span class="kwc">map</span> (\i -&gt; calculate input i size <span class="num">64</span>) [<span class="num">0</span>.<span class="num">.63</span>]
+    results &lt;- ParallelIO.parallel computeHashMaps
+    <span class="kwc">return</span>
+      $ <span class="kwc">foldl</span>&apos; (\ acc hm -&gt; HashMap.unionWith (+) acc hm) HashMap.<span class="kwa">empty</span> results
+
+<span class="slc">-- Compute hashmap from given beginning point with the given increment.</span>
+calculate :: Storable.Vector Word8 -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> (HashMap Incremental <span class="kwb">Int</span>)
+calculate input !beg !size !incr =
+    Stream.<span class="kwc">foldM</span>&apos; updateHashMap HashMap.<span class="kwa">empty</span> (fromVectorWithInc beg size incr end input) &gt;&gt;=
+    traverse readPVar
+  <span class="kwd">where</span>
+    end = Storable.<span class="kwa">length</span> input + <span class="num">1</span> - size
+    updateHashMap
+      :: HashMap Incremental (PVar <span class="kwb">Int</span> RW)
+      -&gt; Incremental
+      -&gt; <span class="kwb">IO</span> (HashMap Incremental (PVar <span class="kwb">Int</span> RW))
+    updateHashMap freqmap slice =
+         <span class="kwd">case</span> HashMap.<span class="kwc">lookup</span> slice freqmap <span class="kwd">of</span>
+            Nothing -&gt; <span class="kwd">do</span>
+              ref &lt;- newPVar <span class="num">1</span>
+              <span class="kwd">let</span>
+                freqmap&apos;
+                    = Internal.insertNewKey (<span class="kwc">fromIntegral</span> (hash slice)) slice ref freqmap
+              pure freqmap&apos;
+            Just x -&gt; modifyPVar_ x (+<span class="num">1</span>) &gt;&gt; pure freqmap
+
+
+<span class="kwd">newtype</span> Incremental = Incremental (Storable.Vector Word8)
+  <span class="kwd">deriving newtype</span> Eq
+
+<span class="slc">-- Use a custom hashable instance using the bit values we</span>
+<span class="slc">-- have extracted from the input</span>
+<span class="kwd">instance</span> Hashable Incremental <span class="kwd">where</span>
+  hash (Incremental v) =
+    Storable.<span class="kwc">foldl</span>&apos;
+    (\ acc w -&gt; (acc `shiftL` <span class="num">2</span>) .|. (<span class="kwc">fromIntegral</span> w))
+    <span class="num">0</span>
+    v
+  hashWithSalt _ = <span class="kwc">error</span> <span class="str">&quot;hashWithSalt not implemented.&quot;</span>
+
+<span class="slc">-- Convert a bytestring to a storable vector without copying.</span>
+<span class="slc">-- Taken from: bytestring-to-vector package</span>
+byteStringToVector :: ByteString -&gt; Storable.Vector Word8
+byteStringToVector bs = vec <span class="kwd">where</span>
+    vec = Storable.unsafeFromForeignPtr fptr off len
+    (fptr, off, len) = toForeignPtr bs
+
+
+fold16M :: (a -&gt; Word16 -&gt; <span class="kwb">IO</span> a) -&gt; a -&gt; Storable.Vector Word8 -&gt; <span class="kwb">IO</span> a
+fold16M f v vec = <span class="kwd">do</span>
+     Storable.unsafeWith vec $ \ptr -&gt; go v ptr (ptr `plusPtr` (len - <span class="num">1</span>))
+  <span class="kwd">where</span>
+    len = Storable.<span class="kwa">length</span> vec
+        <span class="slc">-- tail recursive; traverses array left to right</span>
+    go !z !p end | p == end = <span class="kwc">return</span> z
+                  | <span class="kwc">otherwise</span> =
+                    <span class="kwd">do</span>
+                      x &lt;- peek (castPtr &#64;_ &#64;Word16 p)
+                      z&apos; &lt;- f z x
+                      go z&apos; (p `plusPtr` <span class="num">1</span>) end
+
+
+
+<span class="com">{-# inline fromVectorWithInc #-}</span>
+fromVectorWithInc
+  :: <span class="kwd">forall</span> m . (Monad m)
+  =&gt; <span class="kwb">Int</span>
+  -&gt; <span class="kwb">Int</span>
+  -&gt; <span class="kwb">Int</span>
+  -&gt; <span class="kwb">Int</span>
+  -&gt; Storable.Vector Word8
+  -&gt; Stream m Incremental
+fromVectorWithInc beg size inc end v = Stream step beg
+  <span class="kwd">where</span>
+    <span class="com">{-# INLINE step #-}</span>
+    step :: <span class="kwb">Int</span> -&gt; m (Step <span class="kwb">Int</span> Incremental)
+    step !i | i &gt;= end = <span class="kwc">return</span> Done
+            | <span class="kwc">otherwise</span> = <span class="kwc">return</span> $ Yield (coerce (Storable.unsafeSlice i size v)) (i+inc)
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+The Glorious Glasgow Haskell
+Compilation System,
+version 9.2.1
+
+
+Tue, 25 Jan 2022 17:58:28 GMT
+
+MAKE:
+mv knucleotide.ghc-3.ghc knucleotide.ghc-3.hs
+~/.ghcup/ghc/9.2.1/bin/ghc --make -fllvm -O2 -XBangPatterns -threaded -rtsopts -funbox-strict-fields -XBinaryLiterals -XDerivingStrategies -XGeneralizedNewtypeDeriving -XOverloadedStrings -XScopedTypeVariables -XTypeApplications knucleotide.ghc-3.hs -o knucleotide.ghc-3.ghc_run
+[1 of 1] Compiling Main             ( knucleotide.ghc-3.hs, knucleotide.ghc-3.o )
+Linking knucleotide.ghc-3.ghc_run ...
+rm knucleotide.ghc-3.hs
+
+22.90s to complete and log all make actions
+
+COMMAND LINE:
+./knucleotide.ghc-3.ghc_run +RTS -N4 -K2048M -RTS 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>mandelbrot Haskell GHC&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>mandelbrot Haskell GHC&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/mandelbrot.html#mandelbrot">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">-- The Computer Language Benchmarks Game</span>
+<span class="slc">-- https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">--</span>
+<span class="slc">--</span>
+<span class="slc">-- Translated from C #6 to Haskell by Jaro Reinders</span>
+<span class="slc">--</span>
+<span class="slc">-- Contributed by Kevin Miller</span>
+<span class="slc">--</span>
+<span class="slc">-- ver 2: added a couple of optimizations</span>
+<span class="slc">-- - Reduced number of times a vector of 8 was checked to see if</span>
+<span class="slc">--    they had all escaped, similar to Dominic Letz&apos;s C #5 entry.</span>
+<span class="slc">-- - Processed 64 pixels at a time if width was a multiple of 64,</span>
+<span class="slc">--    thereby reducing writes to the bitmap.</span>
+
+<span class="slc">-- GHC 9.2 fix contributed by Artem Pelenitsyn</span>
+
+<span class="kwd">import</span> GHC.<span class="kwb">IO</span>
+<span class="kwd">import</span> GHC.Exts
+<span class="kwd">import</span> System.Environment
+<span class="kwd">import qualified</span> Data.ByteString.Char8 <span class="kwd">as</span> B
+<span class="kwd">import qualified</span> Data.ByteString.Unsafe <span class="kwd">as</span> B
+<span class="kwd">import</span> Control.Monad
+
+<span class="com">{-# INLINE vecNLE #-}</span>
+vecNLE :: DoubleX24# -&gt; <span class="kwb">Double</span># -&gt; <span class="kwb">Int</span>#
+vecNLE (# v0, v1, v2, v3 #) f
+  =  ((v00 &gt;## f)
+  `andI#` (v01 &gt;## f)
+  `andI#` (v10 &gt;## f)
+  `andI#` (v11 &gt;## f)
+  `andI#` (v20 &gt;## f)
+  `andI#` (v21 &gt;## f)
+  `andI#` (v30 &gt;## f)
+  `andI#` (v31 &gt;## f))
+  <span class="kwd">where</span>
+    !(# v00, v01 #) = unpackDoubleX2# v0
+    !(# v10, v11 #) = unpackDoubleX2# v1
+    !(# v20, v21 #) = unpackDoubleX2# v2
+    !(# v30, v31 #) = unpackDoubleX2# v3
+
+<span class="com">{-# INLINE pixelsGT #-}</span>
+pixelsGT :: DoubleX24# -&gt; <span class="kwb">Double</span># -&gt; Word#
+pixelsGT (# v0, v1, v2, v3 #) f
+  =     ((int2Word# (v00 &lt;=## f)) `uncheckedShiftL#` <span class="num">7</span>#)
+  `<span class="kwa">or</span>#` ((int2Word# (v01 &lt;=## f)) `uncheckedShiftL#` <span class="num">6</span>#)
+  `<span class="kwa">or</span>#` ((int2Word# (v10 &lt;=## f)) `uncheckedShiftL#` <span class="num">5</span>#)
+  `<span class="kwa">or</span>#` ((int2Word# (v11 &lt;=## f)) `uncheckedShiftL#` <span class="num">4</span>#)
+  `<span class="kwa">or</span>#` ((int2Word# (v20 &lt;=## f)) `uncheckedShiftL#` <span class="num">3</span>#)
+  `<span class="kwa">or</span>#` ((int2Word# (v21 &lt;=## f)) `uncheckedShiftL#` <span class="num">2</span>#)
+  `<span class="kwa">or</span>#` ((int2Word# (v30 &lt;=## f)) `uncheckedShiftL#` <span class="num">1</span>#)
+  `<span class="kwa">or</span>#` ((int2Word# (v31 &lt;=## f)) <span class="com">{- `uncheckedShiftL#` 0# -}</span>)
+  <span class="kwd">where</span>
+    !(# v00, v01 #) = unpackDoubleX2# v0
+    !(# v10, v11 #) = unpackDoubleX2# v1
+    !(# v20, v21 #) = unpackDoubleX2# v2
+    !(# v30, v31 #) = unpackDoubleX2# v3
+
+<span class="com">{-# INLINE calcSum #-}</span>
+calcSum
+  :: DoubleX24#
+  -&gt; DoubleX2#
+  -&gt; (# DoubleX24#, DoubleX24#, DoubleX24# #)
+  -&gt; (# DoubleX24#, DoubleX24#, DoubleX24# #)
+calcSum
+  (# initR0, initR1, initR2, initR3 #)
+  initI
+  (# (# r00, r10, r20, r30 #)
+  ,  (# i00, i10, i20, i30 #)
+  ,  (# _, _, _, _ #) #)
+  = (# (# r01, r11, r21, r31 #)
+    ,  (# i01, i11, i21, i31 #)
+    ,  (# sum01, sum11, sum21, sum31 #) #)
+  <span class="kwd">where</span>
+    r&apos;<span class="num">0</span> = r00 `timesDoubleX2#` r00
+    i&apos;<span class="num">0</span> = i00 `timesDoubleX2#` i00
+    ri0 = r00 `timesDoubleX2#` i00
+    sum01 = r&apos;<span class="num">0</span> `plusDoubleX2#` i&apos;<span class="num">0</span>
+    r01 = (r&apos;<span class="num">0</span> `minusDoubleX2#` i&apos;<span class="num">0</span>) `plusDoubleX2#` initR0
+    i01 = (ri0 `plusDoubleX2#` ri0) `plusDoubleX2#` initI
+    
+    r&apos;<span class="num">1</span> = r10 `timesDoubleX2#` r10
+    i&apos;<span class="num">1</span> = i10 `timesDoubleX2#` i10
+    ri1 = r10 `timesDoubleX2#` i10
+    sum11 = r&apos;<span class="num">1</span> `plusDoubleX2#` i&apos;<span class="num">1</span>
+    r11 = (r&apos;<span class="num">1</span> `minusDoubleX2#` i&apos;<span class="num">1</span>) `plusDoubleX2#` initR1
+    i11 = (ri1 `plusDoubleX2#` ri1) `plusDoubleX2#` initI
+    
+    r&apos;<span class="num">2</span> = r20 `timesDoubleX2#` r20
+    i&apos;<span class="num">2</span> = i20 `timesDoubleX2#` i20
+    ri2 = r20 `timesDoubleX2#` i20
+    sum21 = r&apos;<span class="num">2</span> `plusDoubleX2#` i&apos;<span class="num">2</span>
+    r21 = (r&apos;<span class="num">2</span> `minusDoubleX2#` i&apos;<span class="num">2</span>) `plusDoubleX2#` initR2
+    i21 = (ri2 `plusDoubleX2#` ri2) `plusDoubleX2#` initI
+    
+    r&apos;<span class="num">3</span> = r30 `timesDoubleX2#` r30
+    i&apos;<span class="num">3</span> = i30 `timesDoubleX2#` i30
+    ri3 = r30 `timesDoubleX2#` i30
+    sum31 = r&apos;<span class="num">3</span> `plusDoubleX2#` i&apos;<span class="num">3</span>
+    r31 = (r&apos;<span class="num">3</span> `minusDoubleX2#` i&apos;<span class="num">3</span>) `plusDoubleX2#` initR3
+    i31 = (ri3 `plusDoubleX2#` ri3) `plusDoubleX2#` initI
+
+<span class="kwd">type</span> DoubleX24# = (# DoubleX2#, DoubleX2#, DoubleX2#, DoubleX2# #)
+    
+<span class="com">{-# INLINE mand8 #-}</span>
+mand8 :: ByteArray# -&gt; <span class="kwb">Int</span># -&gt; DoubleX2# -&gt; Word#
+mand8 initRs indexR initI = go1 <span class="num">6</span># (# initR, i, initSum #) <span class="kwd">where</span>
+  go1 :: <span class="kwb">Int</span># -&gt; (# DoubleX24#, DoubleX24#, DoubleX24# #) -&gt; Word#
+  go1 <span class="num">0</span># s =
+    <span class="kwd">let</span> !(# _, _, <span class="kwa">sum</span> #) = calcSum initR initI (calcSum initR initI s)
+    <span class="kwd">in</span> pixelsGT <span class="kwa">sum</span> <span class="num">4.0</span>## <span class="slc">-- 0xff##</span>
+  go1 n s =
+    <span class="kwd">let</span> s&apos;&#64;(!(# _, _, <span class="kwa">sum</span> #)) = go2 <span class="num">8</span># s
+    <span class="kwd">in if</span> isTrue# (vecNLE <span class="kwa">sum</span> <span class="num">4.0</span>##) <span class="kwd">then</span> <span class="num">0x00</span>## <span class="kwd">else</span> go1 (n -# <span class="num">1</span>#) s&apos;
+
+  go2 <span class="num">0</span># s = s
+  go2 n s = go2 (n -# <span class="num">1</span>#) (calcSum initR initI s)
+
+  i = (# initI, initI, initI, initI #)
+  initSum =
+    (# broadcastDoubleX2# <span class="num">0.0</span>##
+    ,  broadcastDoubleX2# <span class="num">0.0</span>##
+    ,  broadcastDoubleX2# <span class="num">0.0</span>##
+    ,  broadcastDoubleX2# <span class="num">0.0</span>##
+    #)
+
+  initR0 = indexDoubleX2Array# initRs indexR
+  initR1 = indexDoubleX2Array# initRs (indexR +# <span class="num">1</span>#)
+  initR2 = indexDoubleX2Array# initRs (indexR +# <span class="num">2</span>#)
+  initR3 = indexDoubleX2Array# initRs (indexR +# <span class="num">3</span>#)
+  initR = (# initR0, initR1, initR2, initR3 #)
+
+<span class="com">{-# INLINE mand64 #-}</span>
+mand64 :: ByteArray# -&gt; <span class="kwb">Int</span># -&gt; DoubleX2# -&gt; Word#
+mand64 initRs indexR initI = go <span class="num">8</span># indexR <span class="num">0</span>## <span class="kwd">where</span>
+  go <span class="num">0</span># _ pix64 = pix64
+  go n indexR pix64 = go
+    (n -# <span class="num">1</span>#)
+    (indexR +# <span class="num">4</span>#)
+    ((pix64 `uncheckedShiftRL#` <span class="num">8</span>#) `<span class="kwa">or</span>#` ((mand8 initRs indexR initI) `uncheckedShiftL#` <span class="num">56</span>#))
+
+main :: <span class="kwb">IO</span> ()
+main = <span class="kwd">do</span>
+  xs &lt;- <span class="kwc">getArgs</span>
+  <span class="kwd">let</span>
+    widHt = <span class="kwd">case</span> xs <span class="kwd">of</span>
+      (x : _) -&gt; <span class="kwc">read</span> x
+      _ -&gt; <span class="num">16000</span>
+    widHt# = (\(I# x) -&gt; x) widHt
+    pixelLength# = widHt# *# (widHt# `uncheckedIShiftRA#` <span class="num">3</span>#)
+
+  <span class="kwc">putStrLn</span> (<span class="str">&quot;P4</span><span class="esc">\n</span><span class="str">&quot;</span> ++ <span class="kwc">show</span> widHt ++ <span class="str">&quot; &quot;</span> ++ <span class="kwc">show</span> widHt)
+
+  pixels &lt;- <span class="kwc">join</span> $ <span class="kwb">IO</span> $ \s -&gt;
+    <span class="kwd">case</span> newByteArray# (<span class="num">8</span># *# widHt#) s <span class="kwd">of</span> { (# s, r #) -&gt;
+    <span class="kwd">case</span> newByteArray# (<span class="num">8</span># *# widHt#) s <span class="kwd">of</span> { (# s, i #) -&gt;
+    <span class="kwd">case</span> <span class="num">2.0</span>## /## int2Double# widHt# <span class="kwd">of</span> { a -&gt;
+    <span class="kwd">let</span>
+      <span class="slc">-- go :: Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, (# ByteArray#, ByteArray# #) #)</span>
+      go xy s
+        | isTrue# (xy &lt;# widHt#) =
+          <span class="slc">-- case (\(IO x) -&gt; x) (print (D# (a *## int2Double# xy -## 1.5##))) s of { (# s, () #) -&gt;</span>
+          <span class="kwd">case</span> writeDoubleX2Array# r (xy `uncheckedIShiftRA#` <span class="num">1</span>#) ((broadcastDoubleX2# a `timesDoubleX2#` packDoubleX2# (# int2Double# xy, int2Double# (xy +# <span class="num">1</span>#) #)) `minusDoubleX2#` broadcastDoubleX2# <span class="num">1.5</span>##) s <span class="kwd">of</span> { s -&gt;
+          <span class="kwd">case</span> writeDoubleArray# i xy (a *## int2Double# xy -## <span class="num">1.0</span>##) s <span class="kwd">of</span> { s -&gt;
+          <span class="kwd">case</span> writeDoubleArray# i (xy +# <span class="num">1</span>#) (a *## int2Double# (xy +# <span class="num">1</span>#) -## <span class="num">1.0</span>##) s <span class="kwd">of</span> { s -&gt;
+          go (xy +# <span class="num">2</span>#) s }}}<span class="slc">--}</span>
+        | <span class="kwc">otherwise</span> =
+          <span class="kwd">case</span> unsafeFreezeByteArray# r s <span class="kwd">of</span> { (# s, r #) -&gt;
+          <span class="kwd">case</span> unsafeFreezeByteArray# i s <span class="kwd">of</span> { (# s, i #) -&gt;
+          (# s, (# r, i #) #) }}
+    <span class="kwd">in case</span> go <span class="num">0</span># s <span class="kwd">of</span> { (# s, (# r0, i0 #) #) -&gt;
+    <span class="kwd">case</span> newAlignedPinnedByteArray# pixelLength# <span class="num">8</span># s <span class="kwd">of</span> { (# s, pixels #) -&gt;
+    <span class="kwd">case</span> newMVar# s <span class="kwd">of</span> { (# s, var #) -&gt;
+    <span class="kwd">case</span> putMVar# var <span class="num">0</span> s <span class="kwd">of</span> { s -&gt;
+    <span class="kwd">let</span>
+      chunkSize# = widHt# `uncheckedIShiftRA#` <span class="num">6</span># 
+      worker s
+        | isTrue# (notI# (widHt# `remInt#` <span class="num">64</span>#)) =
+          <span class="kwd">case</span> newMVar# s <span class="kwd">of</span> { (# s, thread #) -&gt;
+          <span class="kwd">case</span> fork# (<span class="kwb">IO</span> (\s -&gt;
+            <span class="kwd">let</span>
+              go s = <span class="kwd">case</span> takeMVar# var s <span class="kwd">of</span>
+                (# s, I# val #)
+                  | isTrue# (val &lt;# widHt#) -&gt;
+                    <span class="kwd">let</span>
+                      chunk
+                        | isTrue# ((widHt# -# val) &lt;=# chunkSize#) = widHt# -# val
+                        | <span class="kwc">otherwise</span> = chunkSize#
+                    <span class="kwd">in</span>
+                      <span class="slc">-- case (\(IO x) -&gt; x) (putStrLn (show (I# (val +# chunk), widHt))) s of { (# s, () #) -&gt;</span>
+                      <span class="kwd">case</span> putMVar# var (I# (val +# chunk)) s <span class="kwd">of</span> { s -&gt;
+                      <span class="kwd">let</span>
+                        go1 y s
+                          | isTrue# (y &lt;# (val +# chunk)) = <span class="slc">-- case (\(IO x) -&gt; x) (putStrLn (show (D# (indexDoubleArray# i0 y)))) s of { (# s, () #) -&gt;</span>
+                            <span class="kwd">let</span> 
+                              init_i = broadcastDoubleX2# (indexDoubleArray# i0 y)
+                              rowstart = y *# (widHt# `uncheckedIShiftRA#` <span class="num">6</span>#)
+                              go2 x s
+                                | isTrue# (x &lt;# widHt#) =
+                                  <span class="slc">-- case (\(IO x) y -&gt; x y) (putStrLn (show (D# (indexDoubleArray# r0 x)))) s of { (# s, () #) -&gt;</span>
+                                  <span class="kwd">case</span> writeWord8Array# pixels (rowstart +# (x `uncheckedIShiftRA#` <span class="num">6</span>#)) (wordToWord8# (mand64 r0 (x `uncheckedIShiftRA#` <span class="num">1</span>#) init_i)) s <span class="kwd">of</span> { s -&gt;
+                                  go2 (x +# <span class="num">64</span>#) s } <span class="slc">-- }</span>
+                                | <span class="kwc">otherwise</span> = s
+                            <span class="kwd">in</span> go1 (y +# <span class="num">1</span>#) (go2 <span class="num">0</span># s) <span class="slc">-- }</span>
+                          | <span class="kwc">otherwise</span> = s
+                      <span class="kwd">in</span> go (go1 val s) }
+                  | <span class="kwc">otherwise</span> -&gt; (# putMVar# thread () (putMVar# var (I# val) s), () #)
+            <span class="kwd">in</span> go s)) s <span class="kwd">of</span>
+            (# s, _ #) -&gt; (# s, thread #) }
+        | <span class="kwc">otherwise</span> = 
+          <span class="kwd">case</span> newMVar# s <span class="kwd">of</span> { (# s, thread #) -&gt;
+          <span class="kwd">case</span> fork# (<span class="kwb">IO</span> (\s -&gt;
+            <span class="kwd">let</span>
+              go s = <span class="kwd">case</span> takeMVar# var s <span class="kwd">of</span>
+                (# s, I# val #)
+                  | isTrue# (val &lt;# widHt#) -&gt;
+                    <span class="kwd">let</span>
+                      chunk
+                        | isTrue# ((widHt# -# val) &lt;=# chunkSize#) = widHt# -# val
+                        | <span class="kwc">otherwise</span> = chunkSize#
+                    <span class="kwd">in</span>
+                      <span class="slc">-- case (\(IO x) -&gt; x) (putStrLn (show (I# (val +# chunk), widHt))) s of { (# s, () #) -&gt;</span>
+                      <span class="kwd">case</span> putMVar# var (I# (val +# chunk)) s <span class="kwd">of</span> { s -&gt;
+                      <span class="kwd">let</span>
+                        go1 y s
+                          | isTrue# (y &lt;# (val +# chunk)) = <span class="slc">-- case (\(IO x) -&gt; x) (putStrLn (show (D# (indexDoubleArray# i0 y)))) s of { (# s, () #) -&gt;</span>
+                            <span class="kwd">let</span> 
+                              init_i = broadcastDoubleX2# (indexDoubleArray# i0 y)
+                              rowstart = y *# (widHt# `uncheckedIShiftRA#` <span class="num">3</span>#)
+                              go2 x s
+                                | isTrue# (x &lt;# widHt#) =
+                                  <span class="slc">-- case (\(IO x) y -&gt; x y) (putStrLn (show (D# (indexDoubleArray# r0 x)))) s of { (# s, () #) -&gt;</span>
+                                  <span class="kwd">case</span> writeWord8Array# pixels (rowstart +# (x `uncheckedIShiftRA#` <span class="num">3</span>#)) (wordToWord8# (mand8 r0 (x `uncheckedIShiftRA#` <span class="num">1</span>#) init_i)) s <span class="kwd">of</span> { s -&gt;
+                                  go2 (x +# <span class="num">8</span>#) s } <span class="slc">-- }</span>
+                                | <span class="kwc">otherwise</span> = s
+                            <span class="kwd">in</span> go1 (y +# <span class="num">1</span>#) (go2 <span class="num">0</span># s) <span class="slc">-- }</span>
+                          | <span class="kwc">otherwise</span> = s
+                      <span class="kwd">in</span> go (go1 val s) }
+                  | <span class="kwc">otherwise</span> -&gt; (# putMVar# thread () (putMVar# var (I# val) s), () #)
+            <span class="kwd">in</span> go s)) s <span class="kwd">of</span>
+            (# s, _ #) -&gt; (# s, thread #) }
+    <span class="kwd">in</span>
+      <span class="kwd">case</span> worker s <span class="kwd">of</span> { (# s, thread0 #) -&gt; 
+      <span class="kwd">case</span> worker s <span class="kwd">of</span> { (# s, thread1 #) -&gt;
+      <span class="kwd">case</span> worker s <span class="kwd">of</span> { (# s, thread2 #) -&gt;
+      <span class="kwd">case</span> worker s <span class="kwd">of</span> { (# s, thread3 #) -&gt;
+      <span class="kwd">case</span> takeMVar# thread0 s <span class="kwd">of</span> { (# s, () #) -&gt;
+      <span class="kwd">case</span> takeMVar# thread1 s <span class="kwd">of</span> { (# s, () #) -&gt;
+      <span class="kwd">case</span> takeMVar# thread2 s <span class="kwd">of</span> { (# s, () #) -&gt;
+      <span class="kwd">case</span> takeMVar# thread3 s <span class="kwd">of</span> { (# s, () #) -&gt;
+      <span class="kwd">case</span> unsafeFreezeByteArray# pixels s <span class="kwd">of</span> { (# s, pixels #) -&gt;
+      (# s, B.unsafePackAddressLen (I# pixelLength#) (byteArrayContents# pixels) #) }
+      }}}}}}}}}}}}}}}
+  B.<span class="kwc">putStr</span> pixels
+
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+The Glorious Glasgow Haskell
+Compilation System,
+version 9.2.1
+
+
+Tue, 25 Jan 2022 18:03:20 GMT
+
+MAKE:
+mv mandelbrot.ghc-3.ghc mandelbrot.ghc-3.hs
+~/.ghcup/ghc/9.2.1/bin/ghc --make -fllvm -O2 -XBangPatterns -threaded -rtsopts -XMagicHash -XUnboxedTuples mandelbrot.ghc-3.hs -o mandelbrot.ghc-3.ghc_run
+[1 of 1] Compiling Main             ( mandelbrot.ghc-3.hs, mandelbrot.ghc-3.o )
+Linking mandelbrot.ghc-3.ghc_run ...
+rm mandelbrot.ghc-3.hs
+
+9.99s to complete and log all make actions
+
+COMMAND LINE:
+./mandelbrot.ghc-3.ghc_run +RTS -N4 -RTS 16000
+
+(BINARY) PROGRAM OUTPUT NOT SHOWN
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>fannkuch-redux C++ g++ program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>fannkuch-redux C++ g++ program</h1>
+    <aside>
+      <p><a href="../description/fannkuchredux.html#fannkuchredux">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">   contributed by Branimir Maksimovic</span>
+<span class="com">   first permutation algo taken from Miroslav Rubanets program</span>
+<span class="com">*/</span>
+<span class="ppc">#include &lt;cstdlib&gt;</span>
+<span class="ppc">#include &lt;cstdio&gt;</span>
+<span class="ppc">#include &lt;algorithm&gt;</span>
+<span class="ppc">#include &lt;future&gt;</span>
+<span class="ppc">#include &lt;unistd.h&gt;</span>
+
+<span class="kwc">typedef</span> <span class="kwb">unsigned char</span> int_t;
+
+<span class="kwb">void</span> <span class="kwd">rotate</span>(int_t* p, <span class="kwb">int</span> n)
+{
+   int_t tmp = p[<span class="num">0</span>];
+   <span class="kwa">for</span>(<span class="kwb">int</span> i = <span class="num">0</span>; i &lt; n; ++i)p[i]=p[i+<span class="num">1</span>];
+   p[n] = tmp;
+}
+
+<span class="kwb">void</span> <span class="kwd">next_permutation</span>(int_t* beg, <span class="kwb">int</span> n, int_t* c)
+{
+   <span class="kwb">int</span> i = <span class="num">1</span>;
+   <span class="kwa">while</span>(i&lt;n)
+   {
+      <span class="kwd">rotate</span>(beg,i);
+      <span class="kwa">if</span>(c[i]&gt;=i)c[i++]=<span class="num">0</span>;
+      <span class="kwa">else break</span>;
+   }
+   ++c[i];
+}
+
+<span class="kwc">class</span> Perm{
+<span class="kwc">public</span>:
+<span class="kwb">struct</span> P{
+   int_t p[<span class="num">16</span>];
+};
+<span class="kwd">Perm</span>(<span class="kwb">unsigned</span> n)
+: cnt {<span class="num">0</span>},<span class="kwd">n</span>(n),<span class="kwd">permcount</span>(<span class="num">0</span>)
+{
+   fact[<span class="num">0</span>]=<span class="num">1</span>;
+   <span class="kwa">for</span>(<span class="kwb">unsigned</span> i=<span class="num">1</span>;i&lt;n+<span class="num">1</span>;++i)
+   {
+      fact[i]=fact[i-<span class="num">1</span>]*i;
+   }
+}
+P <span class="kwd">get</span>(<span class="kwb">int</span> idx)
+{ 
+    <span class="kwb">char</span> pp[<span class="num">16</span>]={};
+    permcount = idx;
+    int_t i = <span class="num">0</span>;
+    std::<span class="kwd">generate</span>(perm.p,perm.p+n,[&amp;i](){<span class="kwa">return</span> ++i;});
+    <span class="kwa">for</span> ( <span class="kwb">unsigned</span> i=n-<span class="num">1</span>; i&gt;<span class="num">0</span>; --i ) {
+        <span class="kwb">unsigned</span> d = idx / fact[i];
+        cnt[i] = d;
+        idx = idx % fact[i];
+        std::<span class="kwd">copy</span>( &amp;perm.p[<span class="num">0</span>], &amp;perm.p[i+<span class="num">1</span>], &amp;pp[<span class="num">0</span>] );
+        <span class="kwa">for</span> (<span class="kwb">unsigned</span> j=<span class="num">0</span>; j&lt;=i; ++j ){
+         perm.p[j] = j+d &lt;= i ? pp[j+d] : pp[j+d-i-<span class="num">1</span>];
+      }
+    }
+   <span class="kwa">return</span> perm;
+}
+P <span class="kwd">next</span>()
+{
+   <span class="kwd">next_permutation</span>(perm.p,n,cnt);
+   ++permcount;
+   <span class="kwa">return</span> perm;
+}
+<span class="kwb">unsigned</span> <span class="kwd">count</span>()<span class="kwb">const</span> { <span class="kwa">return</span> permcount; }
+<span class="kwb">unsigned</span> <span class="kwd">max</span>()<span class="kwb">const</span> { <span class="kwa">return</span> fact[n]; }
+<span class="kwc">private</span>:
+   int_t cnt[<span class="num">16</span>];
+   <span class="kwb">unsigned</span> fact[<span class="num">16</span>],n,permcount;
+   P perm;
+};
+
+<span class="kwb">struct</span> Result{
+   <span class="kwb">int</span> checksum;
+   <span class="kwb">int</span> maxflips;
+};
+
+Result <span class="kwd">work</span>(Perm perm,<span class="kwb">unsigned</span> n,<span class="kwb">unsigned</span> max)
+{
+   Result r={<span class="num">0</span>};
+   Perm::P p = perm.<span class="kwd">get</span>(n);
+   <span class="kwa">for</span>(; perm.<span class="kwd">count</span>()&lt;max;p=perm.<span class="kwd">next</span>())
+   {
+      <span class="kwb">int</span> flips = <span class="num">0</span>;
+      <span class="kwa">while</span>(p.p[<span class="num">0</span>] != <span class="num">1</span>)
+      {
+         std::<span class="kwd">reverse</span>(p.p,p.p+p.p[<span class="num">0</span>]);
+         ++flips;
+      }
+      r.checksum += (perm.<span class="kwd">count</span>()%<span class="num">2</span> == <span class="num">0</span>)?flips:-flips;
+      r.maxflips = std::<span class="kwd">max</span>(r.maxflips,flips);
+   }
+   <span class="kwa">return</span> r;
+}
+
+Result <span class="kwd">fannkuch</span>(<span class="kwb">int</span> n)
+{
+   Result tmp = {<span class="num">0</span>};
+   Perm <span class="kwd">perm</span>(n);
+   
+   <span class="kwb">unsigned</span> N = <span class="kwd">sysconf</span>(_SC_NPROCESSORS_ONLN);
+   std::future&lt;Result&gt; ft[N];
+   
+   <span class="kwb">unsigned</span> k = perm.<span class="kwd">max</span>()/N;
+   <span class="kwb">unsigned</span> j = <span class="num">0</span>;
+   <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = <span class="num">0</span> ; i &lt; N;++i,j+=k)
+   {
+      <span class="kwb">unsigned</span> max = i&lt;N-<span class="num">1</span>?j+k:perm.<span class="kwd">max</span>();
+      ft[i] = std::<span class="kwd">async</span>(std::launch::async,work,perm,j,max);
+   }
+   <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = <span class="num">0</span>; i &lt; N; ++i)
+   {
+      <span class="kwc">auto</span> r = ft[i].<span class="kwd">get</span>();
+      tmp.checksum += r.checksum;
+      tmp.maxflips = std::<span class="kwd">max</span>(tmp.maxflips,r.maxflips);
+   }
+   <span class="kwa">return</span> tmp;
+}
+
+<span class="kwb">int</span> <span class="kwd">main</span>(<span class="kwb">int</span> argc, <span class="kwb">char</span>** argv)
+{
+   <span class="kwb">int</span> n = <span class="num">7</span>;
+   <span class="kwa">if</span>(argc &gt; <span class="num">1</span>)n = <span class="kwd">atoi</span>(argv[<span class="num">1</span>]);
+   <span class="kwa">if</span>(n &lt; <span class="num">3</span> || n &gt; <span class="num">12</span>)
+   {
+      <span class="kwd">printf</span>(<span class="str">&quot;n should be between [3 and 12]</span><span class="esc">\n</span><span class="str">&quot;</span>);
+      <span class="kwa">return</span> <span class="num">0</span>;
+   }
+   Result r = <span class="kwd">fannkuch</span>(n);
+   <span class="kwd">printf</span>(<span class="str">&quot;%d</span><span class="esc">\n</span><span class="str">Pfannkuchen(%d) = %d</span><span class="esc">\n</span><span class="str">&quot;</span>,r.checksum,n,r.maxflips);
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 20:10:13 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -std=c++11 -pthread fannkuchredux.c++ -o fannkuchredux.c++.o &amp;&amp;  \
+        /usr/bin/g++ fannkuchredux.c++.o -o fannkuchredux.gpp_run -lpthread 
+rm fannkuchredux.c++
+
+3.38s to complete and log all make actions
+
+COMMAND LINE:
+./fannkuchredux.gpp_run 12
+
+PROGRAM OUTPUT:
+3968050
+Pfannkuchen(12) = 65
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>reverse-complement C++ g++&nbsp;#2 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>reverse-complement C++ g++&nbsp;#2 program</h1>
+    <aside>
+      <p><a href="../description/revcomp.html#revcomp">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">// The Computer Language Benchmarks Game</span>
+<span class="slc">// https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">//</span>
+<span class="slc">// contributed by Adam Kewley</span>
+
+<span class="ppc">#include &lt;iostream&gt;</span>
+<span class="ppc">#include &lt;string&gt;</span>
+<span class="ppc">#include &lt;vector&gt;</span>
+
+<span class="ppc">#ifdef SIMD</span>
+<span class="ppc">#include &lt;immintrin.h&gt;</span>
+<span class="ppc">#endif</span>
+
+<span class="kwa">namespace</span> {
+    <span class="kwa">using</span> std::istream;
+    <span class="kwa">using</span> std::ostream;
+    <span class="kwa">using</span> std::runtime_error;
+    <span class="kwa">using</span> std::string;
+    <span class="kwa">using</span> std::bad_alloc;
+    <span class="kwa">using</span> std::vector;
+
+    <span class="kwc">constexpr</span> <span class="kwb">size_t</span> basepairs_in_line = <span class="num">60</span>;
+    <span class="kwc">constexpr</span> <span class="kwb">size_t</span> line_len = basepairs_in_line + <span class="kwa">sizeof</span>(<span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>);
+
+    <span class="slc">// custom vector impl. that has *similar* methods to a</span>
+    <span class="slc">// `vector&lt;char&gt;`. The reason this is necessary is because the stdlib</span>
+    <span class="slc">// `vector&lt;char&gt;` implementation requires that `.resize` initializes</span>
+    <span class="slc">// the newly-allocated content, and that `realloc` cannot be</span>
+    <span class="slc">// used. Valgrind reports that that is ~10-20 % of application</span>
+    <span class="slc">// perf. for large inputs.</span>
+    <span class="kwc">class</span> unsafe_vector {
+    <span class="kwc">public</span>:
+        <span class="kwd">unsafe_vector</span>() {
+            _buf = (<span class="kwb">char</span>*)<span class="kwd">malloc</span>(_capacity);
+            <span class="kwa">if</span> (_buf == <span class="kwc">nullptr</span>) {
+                <span class="kwa">throw</span> bad_alloc{};
+            }
+        }
+
+        <span class="kwd">unsafe_vector</span>(<span class="kwb">const</span> unsafe_vector&amp; other) = <span class="kwa">delete</span>;
+        <span class="kwd">unsafe_vector</span>(unsafe_vector&amp;&amp; other) = <span class="kwa">delete</span>;
+        unsafe_vector&amp; <span class="kwc">operator</span>=(unsafe_vector&amp; other) = <span class="kwa">delete</span>;
+        unsafe_vector&amp; <span class="kwc">operator</span>=(unsafe_vector&amp;&amp; other) = <span class="kwa">delete</span>;
+
+        ~<span class="kwd">unsafe_vector</span>() noexcept {
+            <span class="kwd">free</span>(_buf);
+        }
+
+        <span class="kwb">char</span>* <span class="kwd">data</span>() {
+            <span class="kwa">return</span> _buf;
+        }
+
+        <span class="slc">// Resizes the vector to have a size of `count`. This method is</span>
+        <span class="slc">// UNSAFE because any new vector entries are uninitialized.</span>
+        <span class="kwb">void</span> <span class="kwd">resize_UNSAFE</span>(<span class="kwb">size_t</span> count) {
+            <span class="kwb">size_t</span> rem = _capacity - _size;
+            <span class="kwa">if</span> (count &gt; rem) {
+                <span class="kwd">grow</span>(count);
+            }
+            _size = count;
+        }
+
+        <span class="kwb">size_t</span> <span class="kwd">size</span>() <span class="kwb">const</span> {
+            <span class="kwa">return</span> _size;
+        }
+
+    <span class="kwc">private</span>:
+        <span class="kwb">void</span> <span class="kwd">grow</span>(<span class="kwb">size_t</span> min_cap) {
+            <span class="kwb">size_t</span> new_cap = _capacity;
+            <span class="kwa">while</span> (new_cap &lt; min_cap) {
+                new_cap *= <span class="num">2</span>;
+            }
+
+            <span class="kwb">char</span>* new_buf = (<span class="kwb">char</span>*)<span class="kwd">realloc</span>(_buf, new_cap);
+            <span class="kwa">if</span> (new_buf != <span class="kwc">nullptr</span>) {
+                _capacity = new_cap;
+                _buf = new_buf;
+            } <span class="kwa">else</span> {
+                <span class="slc">// The POSIX definition of `realloc` states that a failed</span>
+                <span class="slc">// reallocation leaves the supplied pointer untouched, so</span>
+                <span class="slc">// throw here and let the class&apos;s destructor free the</span>
+                <span class="slc">// untouched ptr (if necessary).</span>
+                <span class="kwa">throw</span> bad_alloc{};
+            }
+        }
+
+        <span class="kwb">char</span>* _buf = <span class="kwc">nullptr</span>;
+        <span class="kwb">size_t</span> _size = <span class="num">0</span>;
+        <span class="kwb">size_t</span> _capacity = <span class="num">1024</span>;
+    };
+
+    <span class="slc">// Returns the complement of a a single basepair character. newline</span>
+    <span class="slc">// characters are unaffected.</span>
+    <span class="kwb">char</span> <span class="kwd">complement</span>(<span class="kwb">char</span> character) {
+        <span class="slc">// this LUT can be made smaller by ANDing with 0x1f (effectively,</span>
+        <span class="slc">// drag the table up and paste the newline in), but that adds one</span>
+        <span class="slc">// more instruction (`and`). Benchmarks show a tiny improvement by</span>
+        <span class="slc">// just doing a straight lookup into a larger LUT.</span>
+        <span class="kwb">static const char</span> complement_lut[] = {
+            <span class="slc">// [0-32): non-printables: just ensure that newline gets</span>
+            <span class="slc">// identity-complemented.</span>
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+
+            <span class="slc">// [32-64): not useful here</span>
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,  <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+
+            <span class="slc">// [64-96): uppercase chars</span>
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;T&apos;</span>, <span class="str">&apos;V&apos;</span>, <span class="str">&apos;G&apos;</span>,     <span class="str">&apos;H&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;C&apos;</span>,
+            <span class="str">&apos;D&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;M&apos;</span>,    <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;K&apos;</span>, <span class="str">&apos;N&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;Y&apos;</span>, <span class="str">&apos;S&apos;</span>,    <span class="str">&apos;A&apos;</span>, <span class="str">&apos;A&apos;</span>, <span class="str">&apos;B&apos;</span>, <span class="str">&apos;W&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;R&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,   <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+
+            <span class="slc">// [96-128]: lowercase chars</span>
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;T&apos;</span>, <span class="str">&apos;V&apos;</span>, <span class="str">&apos;G&apos;</span>,     <span class="str">&apos;H&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;C&apos;</span>,
+            <span class="str">&apos;D&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;M&apos;</span>,   <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;K&apos;</span>, <span class="str">&apos;N&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;Y&apos;</span>, <span class="str">&apos;S&apos;</span>,    <span class="str">&apos;A&apos;</span>, <span class="str">&apos;A&apos;</span>, <span class="str">&apos;B&apos;</span>, <span class="str">&apos;W&apos;</span>,
+            <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;R&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,   <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>
+        };
+
+        <span class="kwa">return</span> complement_lut[character];
+    }
+
+    <span class="slc">// Complement then swap `*a` with `*b`</span>
+    <span class="kwb">void</span> <span class="kwd">complement_swap</span>(<span class="kwb">char</span>* a, <span class="kwb">char</span>* b) {
+        <span class="kwb">char</span> tmp = <span class="kwd">complement</span>(*a);
+        *a = <span class="kwd">complement</span>(*b);
+        *b = tmp;
+    }
+
+<span class="ppc">#ifdef SIMD</span>
+    __m128i <span class="kwd">packed</span>(<span class="kwb">char</span> c) {
+        <span class="kwa">return</span> <span class="kwd">_mm_set_epi8</span>(c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c);
+    }
+
+    __m128i <span class="kwd">reverse_complement_simd</span>(__m128i v) {
+        <span class="slc">// reverse elements in the registers</span>
+        v =  <span class="kwd">_mm_shuffle_epi8</span>(v, <span class="kwd">_mm_set_epi8</span>(<span class="num">0</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>));
+
+        <span class="slc">// AND all elements with 0x1f, so that a smaller LUT (&lt; 32 bytes)</span>
+        <span class="slc">// can be used. This is important with SIMD because, unlike</span>
+        <span class="slc">// single-char complement (above), SIMD uses 16-byte shuffles. The</span>
+        <span class="slc">// single-char LUT would require four shuffles, this LUT requires</span>
+        <span class="slc">// two.</span>
+        v = <span class="kwd">_mm_and_si128</span>(v, <span class="kwd">packed</span>(<span class="num">0x1f</span>));
+
+
+        <span class="slc">// Lookup for all elements &lt;16</span>
+        __m128i lt16_mask = <span class="kwd">_mm_cmplt_epi8</span>(v, <span class="kwd">packed</span>(<span class="num">16</span>));
+        __m128i lt16_els = <span class="kwd">_mm_and_si128</span>(v, lt16_mask);
+        __m128i lt16_lut = <span class="kwd">_mm_set_epi8</span>(<span class="str">&apos;\0&apos;</span>, <span class="str">&apos;N&apos;</span>, <span class="str">&apos;K&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+                                        <span class="str">&apos;M&apos;</span>, <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;D&apos;</span>,
+                                        <span class="str">&apos;C&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;H&apos;</span>,
+                                        <span class="str">&apos;G&apos;</span>, <span class="str">&apos;V&apos;</span>, <span class="str">&apos;T&apos;</span>, <span class="str">&apos;\0&apos;</span>);
+        __m128i lt16_vals = <span class="kwd">_mm_shuffle_epi8</span>(lt16_lut, lt16_els);
+
+        <span class="slc">// Lookup for all elements &gt;16</span>
+        __m128i g16_els = <span class="kwd">_mm_sub_epi8</span>(v, <span class="kwd">packed</span>(<span class="num">16</span>));
+        __m128i g16_lut = <span class="kwd">_mm_set_epi8</span>(<span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+                                       <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;R&apos;</span>, <span class="str">&apos;\0&apos;</span>,
+                                       <span class="str">&apos;W&apos;</span>, <span class="str">&apos;B&apos;</span>, <span class="str">&apos;A&apos;</span>, <span class="str">&apos;A&apos;</span>,
+                                       <span class="str">&apos;S&apos;</span>, <span class="str">&apos;Y&apos;</span>, <span class="str">&apos;\0&apos;</span>, <span class="str">&apos;\0&apos;</span>);
+        __m128i g16_vals = <span class="kwd">_mm_shuffle_epi8</span>(g16_lut, g16_els);
+
+        <span class="slc">// OR both lookup results</span>
+        <span class="kwa">return</span> <span class="kwd">_mm_or_si128</span>(lt16_vals, g16_vals);
+    }
+<span class="ppc">#endif</span>
+
+    <span class="slc">// Reverse-complement a contiguous range, [begin, end), of bps.</span>
+    <span class="slc">//</span>
+    <span class="slc">// precondition: [begin, end) can be reverse-complemented without</span>
+    <span class="slc">// needing to account for newlines etc. (the caller should handle this</span>
+    <span class="slc">// externally).</span>
+    <span class="kwb">void</span> <span class="kwd">reverse_complement_bps</span>(<span class="kwb">char</span>* start, <span class="kwb">char</span>* end, <span class="kwb">size_t</span> num_bps) {
+<span class="ppc">#ifdef SIMD</span>
+        <span class="kwa">while</span> (num_bps &gt;= <span class="num">16</span>) {
+            end -= <span class="num">16</span>;
+
+            __m128i tmp = <span class="kwd">_mm_lddqu_si128</span>((__m128i*)start);
+            <span class="kwd">_mm_storeu_si128</span>((__m128i*)start, <span class="kwd">reverse_complement_simd</span>(<span class="kwd">_mm_lddqu_si128</span>((__m128i*)end)));
+            <span class="kwd">_mm_storeu_si128</span>((__m128i*)end, <span class="kwd">reverse_complement_simd</span>(tmp));
+
+            num_bps -= <span class="num">16</span>;
+            start += <span class="num">16</span>;
+        }
+<span class="ppc">#else</span>
+        <span class="slc">// even when not using platform-dependent SIMD, it&apos;s still</span>
+        <span class="slc">// advantageous to unroll the loop. This gives a ~10 % speedup on</span>
+        <span class="slc">// my laptop (intel i7-8550U)</span>
+        <span class="kwa">while</span> (num_bps &gt;= <span class="num">16</span>) {
+            <span class="kwa">for</span> (<span class="kwb">size_t</span> i = <span class="num">0</span>; i &lt; <span class="num">16</span>; ++i) {
+                <span class="kwd">complement_swap</span>(start++, --end);
+            }
+
+            num_bps -= <span class="num">16</span>;
+        }
+<span class="ppc">#endif</span>
+
+        <span class="slc">// portable and works for all sizes of inputs, but is slowest.</span>
+        <span class="kwa">for</span> (<span class="kwb">size_t</span> i = <span class="num">0</span>; i &lt; num_bps; ++i) {
+            <span class="kwd">complement_swap</span>(start++, --end);
+        }
+    }
+
+    <span class="kwb">struct</span> Sequence {
+        string header;  <span class="slc">// not incl. starting delim (&gt;)</span>
+        unsafe_vector seq;  <span class="slc">// basepair lines. all lines terminated by newline</span>
+    };
+
+    <span class="slc">// Reverse-complements a FASTA sequence. Unformatted basepair (no</span>
+    <span class="slc">// header) input. All lines apart from the last line contain *exactly*</span>
+    <span class="slc">// 60 basepairs. The last line can contain &lt;= 60 basepairs, and must</span>
+    <span class="slc">// have a trailing newline.</span>
+    <span class="slc">//</span>
+    <span class="slc">// The reason this alg. is more complicated than necessary for several</span>
+    <span class="slc">// reasons:</span>
+    <span class="slc">//</span>
+    <span class="slc">// - If newlines were stripped from the input while reading the input,</span>
+    <span class="slc">//   then memory usage would be ~1/60th lower and this step would be</span>
+    <span class="slc">//   mostly branchless (good). However, writing the output would</span>
+    <span class="slc">//   require re-adding the newlines into some intermediate output</span>
+    <span class="slc">//   buffer before writing the output (very bad).</span>
+    <span class="slc">//</span>
+    <span class="slc">// - If newlines are not stripped from the input, then they need to be</span>
+    <span class="slc">//   handled by this step. The easiest way to handle the newlines (&lt;10</span>
+    <span class="slc">//   LOC) is to have an `if (next_char == &apos;\n&apos;) skip;` check on each</span>
+    <span class="slc">//   iteration (front and back). However, this introduces two compare</span>
+    <span class="slc">//   + (sometimes) jump operations per basepair, plus the main loop</span>
+    <span class="slc">//   invariant. It also prevents doing multi-basepair swaps (SIMD,</span>
+    <span class="slc">//   loop unrolling, etc.), which is where the *real* perf gains are</span>
+    <span class="slc">//   hiding (20-50 %).</span>
+    <span class="slc">//</span>
+    <span class="slc">// - So we want to optimize this alg. for branchless, preferably</span>
+    <span class="slc">//   multi-basepair, swaps + complements. However, the presence of</span>
+    <span class="slc">//   trailing newlines means that the input might be non-symmetric</span>
+    <span class="slc">//   (that is, the data cannot be blindly swapped because the newlines</span>
+    <span class="slc">//   will end up in an incorrect location in the output).</span>
+    <span class="kwb">void</span> <span class="kwd">reverse_complement</span>(Sequence&amp; s) {
+        <span class="kwb">char</span>* begin = s.seq.<span class="kwd">data</span>();
+        <span class="kwb">char</span>* end = s.seq.<span class="kwd">data</span>() + s.seq.<span class="kwd">size</span>();
+
+        <span class="kwa">if</span> (begin == end) {
+            <span class="kwa">return</span>;
+        }
+
+        <span class="kwb">size_t</span> len = end - begin;
+        <span class="kwb">size_t</span> trailer_len = len % line_len;
+
+        <span class="slc">// skip end-of-data, so that `end` points to the last newline in</span>
+        <span class="slc">// the input (i.e. &quot;just past the end of the last basepair&quot;)</span>
+        end--;
+
+        <span class="slc">// optimal case: all lines in the input are exactly `line_len` in</span>
+        <span class="slc">// length, with no trailing bps. The relative offsets (from</span>
+        <span class="slc">// begin/end) of newlines in the data are symmetrical. Therefore,</span>
+        <span class="slc">// The algorithm can just reverse + complement the entire input,</span>
+        <span class="slc">// apart from the last newline.</span>
+        <span class="kwa">if</span> (trailer_len == <span class="num">0</span>) {
+
+            <span class="kwb">size_t</span> num_pairs = len/<span class="num">2</span>;
+            <span class="kwd">reverse_complement_bps</span>(begin, end, num_pairs);
+
+            <span class="kwb">bool</span> has_middle_bp = (len % <span class="num">2</span>) &gt; <span class="num">0</span>;
+            <span class="kwa">if</span> (has_middle_bp) {
+                begin[num_pairs] = <span class="kwd">complement</span>(begin[num_pairs]);
+            }
+
+            <span class="kwa">return</span>;
+        }
+
+        <span class="slc">// suboptimal case: the last line in the sequence is &lt; `line_len`</span>
+        <span class="slc">// (it is a &quot;trailing&quot; line). This means that newlines in the</span>
+        <span class="slc">// input appear at non-symmetrical offsets relative to `begin` and</span>
+        <span class="slc">// `end`. Because of this, the algorithm has to carefully step</span>
+        <span class="slc">// over the newlines so that they aren&apos;t reversed into an</span>
+        <span class="slc">// incorrect location in the output.</span>
+        <span class="kwb">size_t</span> trailer_bps = trailer_len &gt; <span class="num">0</span> ? trailer_len - <span class="num">1</span> : <span class="num">0</span>;
+
+        <span class="kwb">size_t</span> rem_bps = basepairs_in_line - trailer_bps;
+        <span class="kwb">size_t</span> rem_bytes = rem_bps + <span class="num">1</span>;
+
+        <span class="kwb">size_t</span> num_whole_lines = len / line_len;
+        <span class="kwb">size_t</span> num_steps = num_whole_lines / <span class="num">2</span>;
+
+        <span class="slc">// there are at least two whole lines (+ trailer) per iteration of</span>
+        <span class="slc">// this loop. This means that we can revcomp the trailer, skip the</span>
+        <span class="slc">// trailer (+ newline, on the trailer&apos;s side), then revcomp the</span>
+        <span class="slc">// remainder, skip the remainder (+newline, on the starting side)</span>
+        <span class="slc">// to maintain the loop invariant.</span>
+        <span class="kwa">for</span> (<span class="kwb">size_t</span> i = <span class="num">0</span>; i &lt; num_steps; ++i) {
+            <span class="kwd">reverse_complement_bps</span>(begin, end, trailer_bps);
+            begin += trailer_bps;
+            end -= trailer_len;
+
+            <span class="kwd">reverse_complement_bps</span>(begin, end, rem_bps);
+            begin += rem_bytes;
+            end -= rem_bps;
+        }
+
+        <span class="slc">// there may be one whole line (+ trailer) remaining. In this</span>
+        <span class="slc">// case, we do the first step of the above (revcomp the trailer)</span>
+        <span class="slc">// but *not* the second (revcomp the remainder) because the</span>
+        <span class="slc">// remainder will overlap.</span>
+        <span class="kwb">bool</span> has_unpaired_line = (num_whole_lines % <span class="num">2</span>) &gt; <span class="num">0</span>;
+        <span class="kwa">if</span> (has_unpaired_line) {
+            <span class="kwd">reverse_complement_bps</span>(begin, end, trailer_bps);
+            begin += trailer_bps;
+            end -= trailer_len;
+        }
+
+        <span class="slc">// no *whole* lines remaining, but there may be bytes remaining on</span>
+        <span class="slc">// the current line.</span>
+        <span class="kwb">size_t</span> bps_in_last_line = end - begin;
+        <span class="kwb">size_t</span> swaps_in_last_line = bps_in_last_line/<span class="num">2</span>;
+        <span class="kwd">reverse_complement_bps</span>(begin, end, swaps_in_last_line);
+
+        <span class="slc">// edge case: there is exactly one byte in the middle of the input</span>
+        <span class="slc">// that needs to be complemented *but not swapped*.</span>
+        <span class="kwb">bool</span> has_unpaired_byte = (bps_in_last_line % <span class="num">2</span>) &gt; <span class="num">0</span>;
+        <span class="kwa">if</span> (has_unpaired_byte) {
+            begin[swaps_in_last_line] = <span class="kwd">complement</span>(begin[swaps_in_last_line]);
+        }
+    }
+
+    <span class="kwb">void</span> <span class="kwd">read_up_to</span>(istream&amp; in, unsafe_vector&amp; out, <span class="kwb">char</span> delim) {
+        <span class="kwc">constexpr</span> <span class="kwb">size_t</span> read_size = <span class="num">1</span>&lt;&lt;<span class="num">16</span>;
+
+        <span class="kwb">size_t</span> bytes_read = <span class="num">0</span>;
+        out.<span class="kwd">resize_UNSAFE</span>(read_size);
+        <span class="kwa">while</span> (in) {
+            in.<span class="kwd">getline</span>(out.<span class="kwd">data</span>() + bytes_read, read_size, delim);
+            bytes_read += in.<span class="kwd">gcount</span>();
+
+            <span class="kwa">if</span> (in.<span class="kwd">fail</span>()) {
+                <span class="slc">// failed because it ran out of buffer space. Expand the</span>
+                <span class="slc">// buffer and perform another read</span>
+                out.<span class="kwd">resize_UNSAFE</span>(bytes_read + read_size);
+                in.<span class="kwd">clear</span>(in.<span class="kwd">rdstate</span>() &amp; ~std::ios::failbit);
+            } <span class="kwa">else if</span> (in.<span class="kwd">eof</span>()) {
+                <span class="slc">// hit EOF, rather than delmiter, but an EOF can be</span>
+                <span class="slc">// treated almost identially to a delmiter, except that we</span>
+                <span class="slc">// don&apos;t remove the delimiter from the read buffer.</span>
+                <span class="kwa">break</span>;
+            } <span class="kwa">else</span> {
+                <span class="slc">// succeeded in reading *up to and including* the sequence</span>
+                <span class="slc">// delimiter. Remove the delmiter.</span>
+                --bytes_read;
+                <span class="kwa">break</span>;
+            }
+        }
+        out.<span class="kwd">resize_UNSAFE</span>(bytes_read);
+    }
+
+    <span class="slc">// Read a sequence, starting *after* the first delimiter (&gt;)</span>
+    <span class="kwb">void</span> <span class="kwd">read_sequence</span>(istream&amp; in, Sequence&amp; out) {
+        out.header.<span class="kwd">resize</span>(<span class="num">0</span>);
+        std::<span class="kwd">getline</span>(in, out.header);
+        <span class="kwd">read_up_to</span>(in, out.seq, <span class="str">&apos;&gt;&apos;</span>);
+    }
+
+    <span class="kwb">void</span> <span class="kwd">write_sequence</span>(ostream&amp; out, Sequence&amp; s) {
+        out &lt;&lt; <span class="str">&apos;&gt;&apos;</span>;
+        out &lt;&lt; s.header;
+        out &lt;&lt; <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+        out.<span class="kwd">write</span>(s.seq.<span class="kwd">data</span>(), s.seq.<span class="kwd">size</span>());
+    }
+}
+
+<span class="kwa">namespace</span> revcomp {
+    <span class="slc">// Reverse-complement an istream of FASTA data (in) and write the</span>
+    <span class="slc">// output into `out`.</span>
+    <span class="kwb">void</span> <span class="kwd">reverse_complement_fasta_stream</span>(istream&amp; in, ostream&amp; out) {
+        <span class="slc">// the read function assumes that &apos;&gt;&apos; has already been read</span>
+        <span class="slc">// (because istream::getline will read it per loop iteration:</span>
+        <span class="slc">// prevents needing to &apos;peek&apos; a bunch).</span>
+        <span class="kwa">if</span> (in.<span class="kwd">get</span>() != <span class="str">&apos;&gt;&apos;</span>) {
+            <span class="kwa">throw</span> runtime_error{<span class="str">&quot;unexpected input: next char should be the start of a seqence header&quot;</span>};
+        }
+
+        Sequence s;
+        <span class="kwa">while</span> (<span class="kwa">not</span> in.<span class="kwd">eof</span>()) {
+            <span class="kwd">read_sequence</span>(in, s);
+            <span class="kwd">reverse_complement</span>(s);
+            <span class="kwd">write_sequence</span>(out, s);
+        }
+    }
+}
+
+<span class="ppc">#ifndef NO_MAIN</span>
+<span class="kwb">int</span> <span class="kwd">main</span>() {
+    <span class="slc">// required for *large* (e.g. 1 GiB) inputs</span>
+    std::cin.<span class="kwd">sync_with_stdio</span>(<span class="kwa">false</span>);
+    std::cout.<span class="kwd">sync_with_stdio</span>(<span class="kwa">false</span>);
+
+    revcomp::<span class="kwd">reverse_complement_fasta_stream</span>(std::cin, std::cout);
+}
+<span class="ppc">#endif</span>
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 22:43:13 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -DSIMD -std=c++11 revcomp.gpp-2.c++ -o revcomp.gpp-2.c++.o &amp;&amp;  \
+        /usr/bin/g++ revcomp.gpp-2.c++.o -o revcomp.gpp-2.gpp_run  
+rm revcomp.gpp-2.c++
+
+3.32s to complete and log all make actions
+
+COMMAND LINE:
+./revcomp.gpp-2.gpp_run 0 &lt; revcomp-input100000000.txt
+
+(TRUNCATED) PROGRAM OUTPUT:
+&gt;ONE Homo sapiens alu
+GGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGC
+CCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAA
+GCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCC
+GGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCG
+AACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCG
+TGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTG
+CAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGC
+CTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGT
+ATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTC
+AGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGC
+CCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATC
+TCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGA
+GTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAG
+ACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCC
+GCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGA
+GACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCA
+ACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTA
+CAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACC
+ATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCC
+AAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGC
+TCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCC
+GGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCA
+CCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGC
+TGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGAT
+TACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGG
+CTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGAT
+TCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTA
+ATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTC
+CTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGC
+CACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTG
+GCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAG
+CCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTT
+TAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTG
+ATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGC
+CTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGC
+TCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGC
+TGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGG
+GTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTC
+GGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGG
+AGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTC
+CGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGC
+GCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTT
+GGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGT
+GCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGT
+CGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTT
+CAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACG
+CCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTC
+TCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAG
+GCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGA
+GTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCC
+TGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTT
+TGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGAC
+CTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCG
+CGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCG
+ATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCC
+CGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTA
+GAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCG
+CCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTT
+TGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACT
+GCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGA
+TTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTC
+ACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCT
+CCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCT
+CGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCT
+CCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCG
+CCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCA
+GGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGG
+GATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCC
+AGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGC
+GATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGG
+CTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAA
+CTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTG
+AGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCA
+GTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCT
+CAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTAT
+TTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAG
+GTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCC
+GGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTC
+GGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGT
+AGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGAC
+GGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGC
+CTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGA
+CGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAAC
+CTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACA
+GGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCAT
+GTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAA
+AGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTC
+TGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGG
+GTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACC
+ACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTG
+GTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTA
+CAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCT
+GGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTC
+TCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAAT
+TTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCT
+GACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCA
+CCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGC
+GCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCC
+TCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTA
+GTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGAT
+CCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCT
+TTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTC
+ACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTG
+GGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGT
+TTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGG
+CCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAG
+TCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCG
+CCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGC
+GCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGG
+CCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGC
+TGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCG
+CCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCA
+AGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCC
+CGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTC
+GAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGC
+GTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGT
+GCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTG
+CCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTG
+TATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCT
+CAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCG
+CCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGAT
+CTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCG
+AGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGA
+GACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCC
+CGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTG
+AGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGC
+AACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATT
+ACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCAC
+CATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCC
+CAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCG
+CTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCC
+CGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCC
+ACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGG
+CTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGA
+TTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAG
+GCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGA
+TTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCT
+AATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACT
+CCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAG
+CCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGT
+GGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCA
+GCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTT
+TTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGT
+GATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGG
+CCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGG
+CTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAG
+CTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGG
+GGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCT
+CGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACG
+GAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCT
+CCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGG
+CGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGT
+TGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAG
+TGCTGGGATTACAGGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTG
+TCGCCCAGGCTGGAGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGT
+TCAAGCGATTCTCCTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCAC
+GCCCGGCTAATTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGT
+CTCGAACTCCTGACCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACA
+GGCGTGAGCCACCGCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGG
+AGTGCAGTGGCGCGATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTC
+CTGCCTCAGCCTCCCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTT
+TTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGA
+CCTCAGGTGATCCGCCCGCCTCGGCCTCCCAAAGTGCTGGGATTACAGGCGTGAGCCACC
+GCGCCCGGCCTTTTTGAGACGGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGGCGC
+GATCTCGGCTCACTGCAACCTCCGCCTCCCGGGTTCAAGCGATTCTCCTGCCTCAGCCTC
+CCGAGTAGCTGGGATTACAGGCGCGCGCCACCACGCCCGGCTAATTTTTGTATTTTTAGT
+AGAGACGGGGTTTCACCATGTTGGCCAGGCTGGTCTCGAACTCCTGACCTCAGGTGATCC
+GCCCGCCTCGGCCTCCCAAAGTGCTGGGATT    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

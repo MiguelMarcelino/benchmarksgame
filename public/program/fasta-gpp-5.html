@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>fasta C++ g++&nbsp;#5 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>fasta C++ g++&nbsp;#5 program</h1>
+    <aside>
+      <p><a href="../description/fasta.html#fasta">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com"> https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"> </span>
+<span class="com"> converted to C++ from D by Rafal Rusin</span>
+<span class="com"> modified by Vaclav Haisman</span>
+<span class="com"> modified by The Anh to compile with g++ 4.3.2</span>
+<span class="com"> modified by Branimir Maksimovic</span>
+<span class="com"> modified by Kim Walisch</span>
+<span class="com"> modified by Tavis Bohne</span>
+<span class="com"> made multithreaded by Jeff Wofford on the model of fasta C gcc #7 and fasta Rust #2</span>
+<span class="com"> </span>
+<span class="com"> compiles with gcc fasta.cpp -std=c++11 -O2</span>
+<span class="com"> */</span>
+
+<span class="ppc">#include &lt;algorithm&gt;</span>
+<span class="ppc">#include &lt;array&gt;</span>
+<span class="ppc">#include &lt;vector&gt;</span>
+<span class="ppc">#include &lt;thread&gt;</span>
+<span class="ppc">#include &lt;mutex&gt;</span>
+<span class="ppc">#include &lt;iostream&gt;</span>
+<span class="ppc">#include &lt;numeric&gt;</span>
+<span class="ppc">#include &lt;functional&gt;</span>
+
+<span class="kwb">struct</span> IUB
+{
+   <span class="kwb">float</span> p;
+   <span class="kwb">char</span> c;
+};
+
+<span class="kwb">const</span> std::string alu =
+{
+   <span class="str">&quot;GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGG&quot;</span>
+   <span class="str">&quot;GAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGA&quot;</span>
+   <span class="str">&quot;CCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAAT&quot;</span>
+   <span class="str">&quot;ACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCA&quot;</span>
+   <span class="str">&quot;GCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGG&quot;</span>
+   <span class="str">&quot;AGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCC&quot;</span>
+   <span class="str">&quot;AGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA&quot;</span>
+};
+
+std::array&lt;IUB,<span class="num">15</span>&gt; iub =
+{{
+   { <span class="num">0.27</span>f, <span class="str">&apos;a&apos;</span> },
+   { <span class="num">0.12</span>f, <span class="str">&apos;c&apos;</span> },
+   { <span class="num">0.12</span>f, <span class="str">&apos;g&apos;</span> },
+   { <span class="num">0.27</span>f, <span class="str">&apos;t&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;B&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;D&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;H&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;K&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;M&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;N&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;R&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;S&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;V&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;W&apos;</span> },
+   { <span class="num">0.02</span>f, <span class="str">&apos;Y&apos;</span> }
+}};
+
+std::array&lt;IUB, <span class="num">4</span>&gt; homosapiens =
+{{
+   { <span class="num">0.3029549426680</span>f, <span class="str">&apos;a&apos;</span> },
+   { <span class="num">0.1979883004921</span>f, <span class="str">&apos;c&apos;</span> },
+   { <span class="num">0.1975473066391</span>f, <span class="str">&apos;g&apos;</span> },
+   { <span class="num">0.3015094502008</span>f, <span class="str">&apos;t&apos;</span> }
+}};
+
+<span class="kwb">const int</span> IM = <span class="num">139968</span>;
+<span class="kwb">const float</span> IM_RECIPROCAL = <span class="num">1.0</span>f / IM;
+
+<span class="kwb">uint32_t</span> <span class="kwd">gen_random</span>()
+{
+   <span class="kwb">static const int</span> IA = <span class="num">3877</span>, IC = <span class="num">29573</span>;
+   <span class="kwb">static int</span> last = <span class="num">42</span>;
+   last = (last * IA + IC) % IM;
+   <span class="kwa">return</span> last;
+}
+
+<span class="kwb">char</span> <span class="kwd">convert_trivial</span>(<span class="kwb">char</span> c)
+{
+   <span class="kwa">return</span> c;
+}
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type&gt;
+<span class="kwc">class</span> repeat_generator_type {
+<span class="kwc">public</span>:
+   <span class="kwa">using</span> result_t = <span class="kwb">char</span>;
+   
+   <span class="kwd">repeat_generator_type</span>(iterator_type first, iterator_type last)
+   : <span class="kwd">first</span>(first), <span class="kwd">current</span>(first), <span class="kwd">last</span>(last)
+   { }
+   result_t <span class="kwc">operator</span>()()
+   {
+      <span class="kwa">if</span> (current == last)
+         current = first;
+      iterator_type p = current;
+      ++current;
+      <span class="kwa">return</span> *p;
+   }
+<span class="kwc">private</span>:
+   iterator_type first;
+   iterator_type current;
+   iterator_type last;
+};
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type&gt;
+repeat_generator_type&lt;iterator_type&gt;
+<span class="kwd">make_repeat_generator</span>(iterator_type first, iterator_type last)
+{<span class="kwa">return</span> repeat_generator_type&lt;iterator_type&gt;(first, last);}
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type&gt;
+<span class="kwb">char</span> <span class="kwd">convert_random</span>(<span class="kwb">uint32_t</span> random, iterator_type begin, iterator_type end)
+{
+   <span class="kwb">const float</span> p = random * IM_RECIPROCAL;
+   <span class="kwc">auto</span> result = std::<span class="kwd">find_if</span>(begin, end, [p] (IUB i) { <span class="kwa">return</span> p &lt;= i.p; });
+   <span class="kwa">return</span> result-&gt;c;
+}
+
+<span class="kwb">char</span> <span class="kwd">convert_IUB</span>(<span class="kwb">uint32_t</span> random)
+{
+   <span class="kwa">return</span> <span class="kwd">convert_random</span>(random, iub.<span class="kwd">begin</span>(), iub.<span class="kwd">end</span>() );
+}
+
+<span class="kwb">char</span> <span class="kwd">convert_homosapiens</span>(<span class="kwb">uint32_t</span> random)
+{
+   <span class="kwa">return</span> <span class="kwd">convert_random</span>(random, homosapiens.<span class="kwd">begin</span>(), homosapiens.<span class="kwd">end</span>());
+}
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type&gt;
+<span class="kwc">class</span> random_generator_type {
+<span class="kwc">public</span>:
+   <span class="kwa">using</span> result_t = <span class="kwb">uint32_t</span>;
+   
+   <span class="kwd">random_generator_type</span>(iterator_type first, iterator_type last)
+   : <span class="kwd">first</span>(first), <span class="kwd">last</span>(last)
+   { }
+   result_t <span class="kwc">operator</span>()()
+   {
+      <span class="kwa">return</span> <span class="kwd">gen_random</span>();
+   }
+<span class="kwc">private</span>:
+   iterator_type first;
+   iterator_type last;
+};
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type&gt;
+random_generator_type&lt;iterator_type&gt;
+<span class="kwd">make_random_generator</span>(iterator_type first, iterator_type last)
+{<span class="kwa">return</span> random_generator_type&lt;iterator_type&gt;(first, last);}
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type&gt;
+<span class="kwb">void</span> <span class="kwd">make_cumulative</span>(iterator_type first, iterator_type last)
+{
+   std::<span class="kwd">partial_sum</span>(first, last, first,
+                [] (IUB l, IUB r) -&gt; IUB { r.p += l.p; <span class="kwa">return</span> r; });
+}
+
+<span class="kwb">const size_t</span> CHARS_PER_LINE = <span class="num">60</span>;
+<span class="kwb">const size_t</span> CHARS_PER_LINE_INCL_NEWLINES = CHARS_PER_LINE + <span class="num">1</span>;
+<span class="kwb">const size_t</span> LINES_PER_BLOCK = <span class="num">1024</span>;
+<span class="kwb">const size_t</span> VALUES_PER_BLOCK = CHARS_PER_LINE * LINES_PER_BLOCK;
+<span class="kwb">const size_t</span> CHARS_PER_BLOCK_INCL_NEWLINES = CHARS_PER_LINE_INCL_NEWLINES * LINES_PER_BLOCK;
+
+<span class="kwb">const unsigned</span> THREADS_TO_USE = std::<span class="kwd">max</span>( <span class="num">1U</span>, std::<span class="kwd">min</span>( <span class="num">4U</span>, std::thread::<span class="kwd">hardware_concurrency</span>() ));
+
+<span class="ppc">#define LOCK( mutex ) std::lock_guard&lt; decltype( mutex ) &gt; guard_{ mutex };</span>
+
+std::mutex g_fillMutex;
+<span class="kwb">size_t</span> g_fillThreadIndex = <span class="num">0</span>;
+<span class="kwb">size_t</span> g_totalValuesToGenerate = <span class="num">0</span>;
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type, <span class="kwc">class</span> generator_type&gt;
+<span class="kwb">size_t</span> <span class="kwd">fillBlock</span>(<span class="kwb">size_t</span> currentThread, iterator_type begin, generator_type&amp; generator)
+{
+   <span class="kwa">while</span>( <span class="kwa">true</span> )
+   {
+      <span class="kwd">LOCK</span>(g_fillMutex);
+      <span class="kwa">if</span>(currentThread == g_fillThreadIndex)
+      {
+         <span class="slc">// Select the next thread for this work.</span>
+         ++g_fillThreadIndex;
+         <span class="kwa">if</span>(g_fillThreadIndex &gt;= THREADS_TO_USE)
+         {
+            g_fillThreadIndex = <span class="num">0</span>;
+         }
+         
+         <span class="slc">// Do the work.</span>
+         <span class="kwb">const size_t</span> valuesToGenerate = std::<span class="kwd">min</span>(g_totalValuesToGenerate, VALUES_PER_BLOCK);
+         g_totalValuesToGenerate -= valuesToGenerate;
+         
+         <span class="kwa">for</span>(<span class="kwb">size_t</span> valuesRemaining = <span class="num">0</span>; valuesRemaining &lt; valuesToGenerate; ++valuesRemaining)
+         {
+            *begin++ = <span class="kwd">generator</span>();
+         }
+         
+         <span class="kwa">return</span> valuesToGenerate;
+      }
+   }
+}
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> BlockIter, <span class="kwc">class</span> CharIter, <span class="kwc">class</span> converter_type&gt;
+<span class="kwb">size_t</span> <span class="kwd">convertBlock</span>(BlockIter begin, BlockIter end, CharIter outCharacter, converter_type&amp; converter)
+{
+   <span class="kwb">const</span> <span class="kwc">auto</span> beginCharacter = outCharacter;
+   <span class="kwb">size_t</span> col = <span class="num">0</span>;
+   <span class="kwa">for</span>( ; begin != end; ++begin)
+   {
+      <span class="kwb">const uint32_t</span> random = *begin;
+      
+      *outCharacter++ = <span class="kwd">converter</span>(random);
+      <span class="kwa">if</span>(++col &gt;= CHARS_PER_LINE)
+      {
+         col = <span class="num">0</span>;
+         *outCharacter++ = <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+      }
+   }
+   <span class="slc">//Check if we need to end the line</span>
+   <span class="kwa">if</span>(<span class="num">0</span> != col)
+   {
+      <span class="slc">//Last iteration didn&apos;t end the line, so finish the job.</span>
+      *outCharacter++ = <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+   }
+   
+   <span class="kwa">return</span> std::<span class="kwd">distance</span>(beginCharacter, outCharacter);
+}
+
+std::mutex g_outMutex;
+<span class="kwb">size_t</span> g_outThreadIndex = -<span class="num">1</span>;
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> iterator_type&gt;
+<span class="kwb">void</span> <span class="kwd">writeCharacters</span>(<span class="kwb">size_t</span> currentThread, iterator_type begin, <span class="kwb">size_t</span> count)
+{
+   <span class="kwa">while</span>(<span class="kwa">true</span>)
+   {
+      <span class="kwd">LOCK</span>(g_outMutex);
+      <span class="kwa">if</span>(g_outThreadIndex == -<span class="num">1</span> || currentThread == g_outThreadIndex)
+      {
+         <span class="slc">// Select the next thread for this work.</span>
+         g_outThreadIndex = currentThread + <span class="num">1</span>;
+         <span class="kwa">if</span>(g_outThreadIndex &gt;= THREADS_TO_USE)
+         {
+            g_outThreadIndex = <span class="num">0</span>;
+         }
+         
+         <span class="slc">// Do the work.</span>
+         std::<span class="kwd">fwrite</span>( begin, count, <span class="num">1</span>, stdout );
+         <span class="kwa">return</span>;
+      }
+   }
+}
+
+
+<span class="kwc">template</span>&lt;<span class="kwc">class</span> generator_type, <span class="kwc">class</span> converter_type&gt;
+<span class="kwb">void</span> <span class="kwd">work</span>(<span class="kwb">size_t</span> currentThread, generator_type&amp; generator, converter_type&amp; converter)
+{
+   std::array&lt; typename generator_type::result_t, VALUES_PER_BLOCK &gt; block;
+   std::array&lt; <span class="kwb">char</span>, CHARS_PER_BLOCK_INCL_NEWLINES &gt; characters;
+   
+   <span class="kwa">while</span>(<span class="kwa">true</span>)
+   {
+      <span class="kwb">const</span> <span class="kwc">auto</span> bytesGenerated = <span class="kwd">fillBlock</span>(currentThread, block.<span class="kwd">begin</span>(), generator);
+      
+      <span class="kwa">if</span>( bytesGenerated == <span class="num">0</span> )
+      {
+         <span class="kwa">break</span>;
+      }
+      
+      <span class="kwb">const</span> <span class="kwc">auto</span> charactersGenerated = <span class="kwd">convertBlock</span>(block.<span class="kwd">begin</span>(), block.<span class="kwd">begin</span>() + bytesGenerated, characters.<span class="kwd">begin</span>(), converter);
+      
+      <span class="kwd">writeCharacters</span>(currentThread, characters.<span class="kwd">begin</span>(), charactersGenerated);
+   }
+}
+
+<span class="kwc">template</span> &lt;<span class="kwc">class</span> generator_type, <span class="kwc">class</span> converter_type &gt;
+<span class="kwb">void</span> <span class="kwd">make</span>(<span class="kwb">const char</span>* desc, <span class="kwb">int</span> n, generator_type generator, converter_type converter) {
+   std::cout &lt;&lt; <span class="str">&apos;&gt;&apos;</span> &lt;&lt; desc &lt;&lt; <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+   
+   g_totalValuesToGenerate = n;
+   g_outThreadIndex = -<span class="num">1</span>;
+   g_fillThreadIndex = <span class="num">0</span>;
+   
+   std::vector&lt; std::thread &gt; <span class="kwd">threads</span>(THREADS_TO_USE - <span class="num">1</span>);
+   <span class="kwa">for</span>(<span class="kwb">size_t</span> i = <span class="num">0</span>; i &lt; threads.<span class="kwd">size</span>(); ++i)
+   {
+      threads[ i ] = std::thread{ std::<span class="kwd">bind</span>( &amp;work&lt; generator_type, converter_type &gt;, i, std::<span class="kwd">ref</span>(generator), std::<span class="kwd">ref</span>(converter)) };
+   }
+   
+   <span class="kwd">work</span>(threads.<span class="kwd">size</span>(), generator, converter);
+   
+   <span class="kwa">for</span>(<span class="kwc">auto</span>&amp; thread : threads)
+   {
+      thread.<span class="kwd">join</span>();
+   }
+}
+
+<span class="kwb">int</span> <span class="kwd">main</span>(<span class="kwb">int</span> argc, <span class="kwb">char</span> *argv[])
+{
+   <span class="kwb">int</span> n = <span class="num">1000</span>;
+   <span class="kwa">if</span> (argc &lt; <span class="num">2</span> || (n = std::<span class="kwd">atoi</span>(argv[<span class="num">1</span>])) &lt;= <span class="num">0</span>) {
+      std::cerr &lt;&lt; <span class="str">&quot;usage: &quot;</span> &lt;&lt; argv[<span class="num">0</span>] &lt;&lt; <span class="str">&quot; length</span><span class="esc">\n</span><span class="str">&quot;</span>;
+      <span class="kwa">return</span> <span class="num">1</span>;
+   }
+   
+   <span class="kwd">make_cumulative</span>(iub.<span class="kwd">begin</span>(), iub.<span class="kwd">end</span>());
+   <span class="kwd">make_cumulative</span>(homosapiens.<span class="kwd">begin</span>(), homosapiens.<span class="kwd">end</span>());
+   
+   <span class="kwd">make</span>(<span class="str">&quot;ONE Homo sapiens alu&quot;</span>      , n * <span class="num">2</span>,
+       <span class="kwd">make_repeat_generator</span>(alu.<span class="kwd">begin</span>(), alu.<span class="kwd">end</span>()),
+       &amp;convert_trivial );
+   <span class="kwd">make</span>(<span class="str">&quot;TWO IUB ambiguity codes&quot;</span>   , n * <span class="num">3</span>,
+       <span class="kwd">make_random_generator</span>(iub.<span class="kwd">begin</span>(), iub.<span class="kwd">end</span>()),
+       &amp;convert_IUB );
+   <span class="kwd">make</span>(<span class="str">&quot;THREE Homo sapiens frequency&quot;</span>, n * <span class="num">5</span>,
+       <span class="kwd">make_random_generator</span>(homosapiens.<span class="kwd">begin</span>(), homosapiens.<span class="kwd">end</span>()),
+       &amp;convert_homosapiens );
+   <span class="kwa">return</span> <span class="num">0</span>;
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 21:20:07 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -std=c++11 fasta.gpp-5.c++ -o fasta.gpp-5.c++.o &amp;&amp;  \
+        /usr/bin/g++ fasta.gpp-5.c++.o -o fasta.gpp-5.gpp_run -lpthread 
+rm fasta.gpp-5.c++
+
+2.99s to complete and log all make actions
+
+COMMAND LINE:
+./fasta.gpp-5.gpp_run 25000000
+
+(TRUNCATED) PROGRAM OUTPUT:
+&gt;ONE Homo sapiens alu
+GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGA
+TCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACT
+AAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAG
+GCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCG
+CCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGT
+GGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCA
+GGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAA
+TTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAG
+AATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCA
+GCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGT
+AATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACC
+AGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTG
+GTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACC
+CGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAG
+AGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTT
+TGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACA
+TGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCT
+GTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGG
+TTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGT
+CTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGG
+CGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCG
+TCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTA
+CTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCG
+AGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCG
+GGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACC
+TGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAA
+TACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGA
+GGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACT
+GCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTC
+ACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGT
+TCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGC
+CGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCG
+CTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTG
+GGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCC
+CAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCT
+GGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGC
+GCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGA
+GGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGA
+GACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGA
+GGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTG
+AAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAAT
+CCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCA
+GTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAA
+AAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGC
+GGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCT
+ACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGG
+GAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATC
+GCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGC
+GGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGG
+TCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAA
+AAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAG
+GAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACT
+CCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCC
+TGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAG
+ACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGC
+GTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGA
+ACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGA
+CAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCA
+CTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCA
+ACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCG
+CCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGG
+AGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTC
+CGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCG
+AGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACC
+CCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAG
+CTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAG
+CCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGG
+CCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATC
+ACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAA
+AAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGC
+TGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCC
+ACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGG
+CTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGG
+AGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATT
+AGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAA
+TCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGC
+CTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAA
+TCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAG
+CCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGT
+GGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCG
+GGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAG
+CGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTG
+GGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATG
+GTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGT
+AATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTT
+GCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCT
+CAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCG
+GGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTC
+TCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACT
+CGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAG
+ATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGG
+CGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTG
+AGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATA
+CAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGG
+CAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGC
+ACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCAC
+GCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTC
+GAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCG
+GGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCT
+TGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGG
+CGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCA
+GCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGG
+CCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGC
+GCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGG
+CGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGA
+CTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGG
+CCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAA
+ACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCC
+CAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGT
+GAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAA
+AGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGG
+ATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTAC
+TAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGA
+GGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGC
+GCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGG
+TGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTC
+AGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAA
+ATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGA
+GAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCC
+AGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTG
+TAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGAC
+CAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGT
+GGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAAC
+CCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACA
+GAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACT
+TTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAAC
+ATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCC
+TGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAG
+GTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCG
+TCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAG
+GCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCC
+GTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCT
+ACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCC
+GAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCC
+GGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCAC
+CTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAA
+ATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTG
+AGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCAC
+TGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCT
+CACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAG
+TTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAG
+CCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATC
+GCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCT
+GGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATC
+CCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCC
+TGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGG
+CGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGG
+AGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCG
+AGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGG
+AGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGT
+GAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAA
+TCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGC
+AGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCA
+AAAAGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGG
+CGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTC
+TACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCG
+GGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGAT
+CGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCG
+CGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAG
+GTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACA
+AAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCA
+GGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCAC
+TCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAGGCCGGGCGCGGTGGCTCACGC
+CTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGA
+GACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGG
+CGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTG
+AACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCG
+ACAGAGCGAGACTCCGTCTCAAAAAGGCCGG    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

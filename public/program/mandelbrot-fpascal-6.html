@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>mandelbrot Free Pascal&nbsp;#6 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>mandelbrot Free Pascal&nbsp;#6 program</h1>
+    <aside>
+      <p><a href="../description/mandelbrot.html#mandelbrot">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">(* The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">   - contributed by Ales Katona</span>
+<span class="com">   - modified by Vincent Snijders</span>
+<span class="com">   - optimized and multithreaded by Jean de La Taille</span>
+<span class="com">   - modified by Jeppe Johansen</span>
+<span class="com">   - modified by Peter Blackman (Restore &apos;CalculatePoint&apos; as leaf function, better use of registers)</span>
+<span class="com">   - refactored and modified to use PasMP by Akira1364</span>
+<span class="com">*)</span>
+
+<span class="kwa">program</span> Mandelbrot;
+
+<span class="kwa">uses</span> CMem, <span class="com">{$IFDEF UNIX}</span>CThreads,<span class="com">{$ENDIF}</span> SysUtils, Math, PasMP;
+
+<span class="kwa">const</span> N: Int32 = <span class="num">200</span>;
+
+<span class="kwa">var</span>
+  DimX: Int32;
+  NInv: <span class="kwb">Double</span>;
+  TextBuf: PByte;
+
+  <span class="kwa">procedure</span> <span class="kwd">DoMandelbrot</span>(<span class="kwa">const</span> Job: PPasMPJob;
+                         <span class="kwa">const</span> ThreadIndex: Int32;
+                         <span class="kwa">const</span> Data: <span class="kwb">Pointer</span>;
+                         <span class="kwa">const</span> FromIndex, ToIndex: SizeInt);
+  <span class="kwa">var</span>
+    BufIndex, Bit, Bits, X: Int32;
+    Index: SizeInt;
+    CR, CI: <span class="kwb">Double</span>;
+
+    <span class="kwa">function</span> <span class="kwd">CalculatePoint</span>(<span class="kwa">const</span> CX, CY: <span class="kwb">Double</span>): <span class="kwb">Boolean</span>; <span class="kwa">inline</span>;
+    <span class="kwa">var</span>
+      I: Int32;
+      Limit: <span class="kwb">Double</span> = <span class="num">4</span>;
+      Two: <span class="kwb">Double</span> = <span class="num">2</span>;
+      ZR, ZI, TI, TR: <span class="kwb">Double</span>;
+    <span class="kwa">begin</span>
+      ZR := <span class="num">0</span>; ZI := ZR; TR := ZR; TI := ZR;
+      <span class="kwc">for</span> I := <span class="num">1</span> <span class="kwc">to</span> <span class="num">50</span> <span class="kwc">do</span> <span class="kwa">begin</span>
+        ZI := Two * ZR * ZI + CY;
+        ZR := TR - TI + CX;
+        TI := ZI * ZI;
+        TR := ZR * ZR;
+        <span class="kwc">if</span> (TR + TI &gt;= Limit) <span class="kwc">then</span> <span class="kwd">Exit</span>(<span class="kwb">True</span>);
+      <span class="kwa">end</span>;
+      CalculatePoint := <span class="kwb">False</span>;
+    <span class="kwa">end</span>;
+
+  <span class="kwa">begin</span>
+    <span class="kwc">for</span> Index := FromIndex <span class="kwc">to</span> ToIndex <span class="kwc">do</span> <span class="kwa">begin</span>
+      BufIndex := Index * DimX;
+      <span class="kwd">Prefetch</span>(TextBuf[BufIndex]);
+      Bit := <span class="num">128</span>;
+      Bits := <span class="num">0</span>;
+      CI := ((Index + Index) * NInv) - <span class="num">1.0</span>;
+      <span class="kwc">for</span> X := <span class="num">0</span> <span class="kwc">to</span> <span class="kwd">Pred</span>(N) <span class="kwc">do</span> <span class="kwa">begin</span>
+        CR := ((X + X) * NInv) - <span class="num">1.5</span>;
+        <span class="kwc">if</span> <span class="kwd">CalculatePoint</span>(CR, CI) <span class="kwc">then</span> Bits := Bits <span class="kwa">or</span> Bit;
+        Bit := Bit <span class="kwa">shr</span> <span class="num">1</span>;
+        <span class="kwc">if</span> Bit = <span class="num">0</span> <span class="kwc">then</span> <span class="kwa">begin</span>
+          TextBuf[BufIndex] := <span class="kwa">not</span> Bits;
+          <span class="kwd">Inc</span>(BufIndex);
+          Bits := <span class="num">0</span>;
+          Bit := <span class="num">128</span>;
+        <span class="kwa">end</span>;
+      <span class="kwa">end</span>;
+    <span class="kwa">end</span>;
+  <span class="kwa">end</span>;
+
+<span class="kwa">var</span>
+  Len: SizeUInt;
+  IO: PText;
+
+<span class="kwa">begin</span>
+  <span class="kwc">if</span> ParamCount &gt; <span class="num">0</span> <span class="kwc">then</span> <span class="kwd">Val</span>(<span class="kwd">ParamStr</span>(<span class="num">1</span>), N);
+  DimX := <span class="kwd">Ceil</span>(N / <span class="num">8</span>);
+  NInv := <span class="num">1</span> / N;
+  Len := DimX * N;
+  <span class="kwd">GetMem</span>(TextBuf, Len);
+  <span class="kwc">with</span> TPasMP.<span class="kwd">CreateGlobalInstance</span>() <span class="kwc">do</span>
+    <span class="kwd">Invoke</span>(<span class="kwd">ParallelFor</span>(<span class="kwa">nil</span>, <span class="num">0</span>, <span class="kwd">Pred</span>(N), &#64;DoMandelbrot));
+  IO := &#64;Output;
+  <span class="kwd">Write</span>(IO^, <span class="str">&apos;P4&apos;</span>, <span class="esc">#10</span>, N, <span class="str">&apos; &apos;</span>, N, <span class="esc">#10</span>);
+  <span class="kwd">Flush</span>(IO^);
+  <span class="kwd">FileWrite</span>(StdOutputHandle, TextBuf[<span class="num">0</span>], Len);
+  <span class="kwd">FreeMem</span>(TextBuf);
+<span class="kwa">end</span>.
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+Free Pascal Compiler
+version 3.2.2 [2021/05/16]
+
+
+Mon, 10 Jan 2022 02:08:44 GMT
+
+MAKE:
+mv mandelbrot.fpascal-6.fpascal mandelbrot.fpascal-6.pas
+/opt/src/fpc-3.2.2/bin/fpc -FuInclude/fpascal -XXs -O3 -Ci- -Cr- -g- -CpCOREAVX -CfAVX -Tlinux  -oFPASCAL_RUN mandelbrot.fpascal-6.pas
+Free Pascal Compiler version 3.2.2 [2021/05/16] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Linux for x86-64
+Compiling mandelbrot.fpascal-6.pas
+mandelbrot.fpascal-6.pas(82,5) Note: Call to subroutine &quot;function TPasMP.GetJobWorkerThread:TPasMPJobWorkerThread;&quot; marked as inline is not inlined
+mandelbrot.fpascal-6.pas(82,5) Note: Call to subroutine &quot;procedure TPasMP.PushJob(const Job:PPasMPJob;const JobWorkerThread:TPasMPJobWorkerThread);&quot; marked as inline is not inlined
+Linking FPASCAL_RUN
+88 lines compiled, 1.2 sec
+2 note(s) issued
+mv FPASCAL_RUN mandelbrot.fpascal-6.fpascal_run
+rm mandelbrot.fpascal-6.pas
+
+1.53s to complete and log all make actions
+
+COMMAND LINE:
+./mandelbrot.fpascal-6.fpascal_run 16000
+
+(BINARY) PROGRAM OUTPUT NOT SHOWN
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

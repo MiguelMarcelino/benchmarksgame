@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>fannkuch-redux Haskell GHC&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>fannkuch-redux Haskell GHC&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/fannkuchredux.html#fannkuchredux">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">{-  The Computer Language Benchmarks Game</span>
+<span class="com">    https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com">    contributed by Louis Wasserman</span>
+<span class="com">    </span>
+<span class="com">    This should be compiled with:</span>
+<span class="com">    	-threaded -O2 -fexcess-precision -fasm</span>
+<span class="com">    and run with:</span>
+<span class="com">    	+RTS -N&lt;number of cores&gt; -RTS &lt;input&gt;</span>
+<span class="com">-}</span>
+
+<span class="kwd">import</span> Control.Concurrent
+<span class="kwd">import</span> Control.Monad
+<span class="kwd">import</span> System.Environment
+<span class="kwd">import</span> Foreign <span class="kwd">hiding</span> (rotate)
+<span class="kwd">import</span> Data.Monoid
+
+<span class="kwd">type</span> Perm = Ptr Word8
+
+<span class="kwd">data</span> F = F <span class="com">{-# UNPACK #-}</span> !<span class="kwb">Int</span> <span class="com">{-# UNPACK #-}</span> !<span class="kwb">Int</span>
+
+<span class="kwd">instance</span> Monoid F <span class="kwd">where</span>
+	mempty = F <span class="num">0 0</span>
+	F s1 m1 `mappend` F s2 m2 = F (s1 + s2) (<span class="kwc">max</span> m1 m2)
+
+incPtr = (`advancePtr` <span class="num">1</span>)
+decPtr = (`advancePtr` (-<span class="num">1</span>))
+
+flop :: <span class="kwb">Int</span> -&gt; Perm -&gt; <span class="kwb">IO</span> ()
+flop k xs = flopp xs (xs `advancePtr` k)
+ <span class="kwd">where</span> flopp i j = <span class="kwc">when</span> (i &lt; j) $ swap i j &gt;&gt; flopp (incPtr i) (decPtr j)
+       swap i j = <span class="kwd">do</span>
+	a &lt;- peek i
+	b &lt;- peek j
+	poke j a
+	poke i b
+
+flopS :: Perm -&gt; (<span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> a) -&gt; <span class="kwb">IO</span> a
+flopS !xs f = <span class="kwd">do</span>
+	<span class="kwd">let</span> go !acc = <span class="kwd">do</span>
+		k &lt;- peekElemOff xs <span class="num">0</span>
+		<span class="kwd">if</span> k == <span class="num">0</span> <span class="kwd">then</span> f acc <span class="kwd">else</span> flop (<span class="kwc">fromIntegral</span> k) xs &gt;&gt; go (acc+<span class="num">1</span>)
+	go <span class="num">0</span>
+
+increment :: Ptr Word8 -&gt; Ptr Word8 -&gt; <span class="kwb">IO</span> ()
+increment !p !ct = <span class="kwd">do</span>
+	first &lt;- peekElemOff p <span class="num">1</span>
+	pokeElemOff p <span class="num">1</span> =&lt;&lt; peekElemOff p <span class="num">0</span>
+	pokeElemOff p <span class="num">0</span> first
+	
+	<span class="kwd">let</span> go !i !first = <span class="kwd">do</span>
+		ci &lt;- peekElemOff ct i
+		<span class="kwd">if</span> <span class="kwc">fromIntegral</span> ci &lt; i <span class="kwd">then</span> pokeElemOff ct i (ci+<span class="num">1</span>) <span class="kwd">else do</span>
+			pokeElemOff ct i <span class="num">0</span>
+			<span class="kwd">let</span> !i&apos; = i + <span class="num">1</span>
+			moveArray p (incPtr p) i&apos;
+			pokeElemOff p i&apos; first
+			go i&apos; =&lt;&lt; peekElemOff p <span class="num">0</span>
+	go <span class="num">1</span> first  
+
+genPermutations :: <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; Ptr Word8 -&gt; Ptr Word8 -&gt; <span class="kwb">IO</span> F
+genPermutations !n !l !r !perm !count = allocaArray n $ \ destF -&gt; <span class="kwd">do</span>
+	<span class="kwd">let</span> upd j !f run = <span class="kwd">do</span>
+		p0 &lt;- peekElemOff perm <span class="num">0</span>
+		<span class="kwd">if</span> p0 == <span class="num">0</span> <span class="kwd">then</span> increment perm count &gt;&gt; run f <span class="kwd">else do</span>
+			copyArray destF perm n
+			increment perm count
+			flopS destF $ \ flops -&gt; 
+				run (f `mappend` F (checksum j flops) flops)
+	<span class="kwd">let</span> go j !f = <span class="kwd">if</span> j &gt;= r <span class="kwd">then</span> <span class="kwc">return</span> f <span class="kwd">else</span> upd j f (go (j+<span class="num">1</span>))
+	go l mempty
+ <span class="kwd">where</span> checksum i f = <span class="kwd">if</span> i .&amp;. <span class="num">1</span> == <span class="num">0</span> <span class="kwd">then</span> f <span class="kwd">else</span> -f
+
+facts :: [<span class="kwb">Int</span>]
+facts = <span class="kwc">scanl</span> (*) <span class="num">1</span> [<span class="num">1</span>.<span class="num">.12</span>]
+
+unrank :: <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; (Ptr Word8 -&gt; Ptr Word8 -&gt; <span class="kwb">IO</span> a) -&gt; <span class="kwb">IO</span> a
+unrank !idx !n f = allocaArray n $ \ p -&gt; allocaArray n $ \ count -&gt;
+  allocaArray n $ \ pp -&gt; <span class="kwd">do</span>
+	<span class="kwc">mapM_</span> (\ i -&gt; pokeElemOff p i (<span class="kwc">fromIntegral</span> i)) [<span class="num">0</span>..n-<span class="num">1</span>]
+	<span class="kwd">let</span> go i !idx = <span class="kwc">when</span> (i &gt;= <span class="num">0</span>) $ <span class="kwd">do</span>
+		<span class="kwd">let</span> fi = facts !! i
+		<span class="kwd">let</span> (q, r) = idx `<span class="kwc">quotRem</span>` fi
+		pokeElemOff count i (<span class="kwc">fromIntegral</span> q)
+		copyArray pp p (i+<span class="num">1</span>)
+		<span class="kwd">let</span> go&apos; j = <span class="kwc">when</span> (j &lt;= i) $ <span class="kwd">do</span>
+			<span class="kwd">let</span> jq = j + q
+			pokeElemOff p j =&lt;&lt; peekElemOff pp (<span class="kwd">if</span> jq &lt;= i <span class="kwd">then</span> jq <span class="kwd">else</span> jq - i - <span class="num">1</span>)
+			go&apos; (j+<span class="num">1</span>)
+		go&apos; <span class="num">0</span>
+		go (i-<span class="num">1</span>) r
+	go (n-<span class="num">1</span>) idx
+	f p count
+
+main = <span class="kwd">do</span>
+   n &lt;- <span class="kwc">fmap</span> (<span class="kwc">read</span>.<span class="kwc">head</span>) <span class="kwc">getArgs</span>
+   <span class="kwd">let</span> fact = <span class="kwc">product</span> [<span class="num">1</span>..n]
+   <span class="kwd">let</span> bk = fact `<span class="kwc">quot</span>` <span class="num">4</span>
+   vars &lt;- forM [<span class="num">0</span>,bk..fact-<span class="num">1</span>] $ \ ix -&gt; <span class="kwd">do</span>
+   	var &lt;- newEmptyMVar
+   	forkIO (unrank ix n $ \ p -&gt; genPermutations n ix (<span class="kwc">min</span> fact (ix + bk)) p &gt;=&gt; putMVar var)
+   	<span class="kwc">return</span> var
+   F chksm mflops &lt;- <span class="kwc">liftM</span> mconcat (<span class="kwc">mapM</span> takeMVar vars)
+   <span class="kwc">putStrLn</span> $ (<span class="kwc">show</span> chksm) ++ <span class="str">&quot;</span><span class="esc">\n</span><span class="str">Pfannkuchen(&quot;</span> ++ (<span class="kwc">show</span> n) ++ <span class="str">&quot;) = &quot;</span> ++ (<span class="kwc">show</span> $ mflops)
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+The Glorious Glasgow Haskell
+Compilation System,
+version 9.2.1
+
+
+Tue, 25 Jan 2022 17:51:06 GMT
+
+MAKE:
+mv fannkuchredux.ghc-3.ghc fannkuchredux.ghc-3.hs
+~/.ghcup/ghc/9.2.1/bin/ghc --make -fllvm -O2 -XBangPatterns -threaded -rtsopts -XScopedTypeVariables fannkuchredux.ghc-3.hs -o fannkuchredux.ghc-3.ghc_run
+[1 of 1] Compiling Main             ( fannkuchredux.ghc-3.hs, fannkuchredux.ghc-3.o )
+
+fannkuchredux.ghc-3.hs:21:10: error:
+    • No instance for (Semigroup F)
+        arising from the superclasses of an instance declaration
+    • In the instance declaration for ‘Monoid F’
+   |
+21 | instance Monoid F where
+   |          ^^^^^^^^
+make: [/home/dunham/all-benchmarksgame/2000-benchmarksgame/nanobench/makefiles/u64q.programs.Makefile:255: fannkuchredux.ghc-3.ghc_run] Error 1 (ignored)
+rm fannkuchredux.ghc-3.hs
+
+4.75s to complete and log all make actions
+
+COMMAND LINE:
+./fannkuchredux.ghc-3.ghc_run +RTS -N4 -RTS 10
+
+MAKE ERROR 
+
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

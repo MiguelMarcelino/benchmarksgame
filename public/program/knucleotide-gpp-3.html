@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide C++ g++&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide C++ g++&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">   Contributed by Branimir Maksimovic</span>
+<span class="com">*/</span>
+
+<span class="slc">// g++ 4.8.x bug, compile with: -Wl,--no-as-needed option </span>
+
+<span class="ppc">#include &lt;iostream&gt;</span>
+<span class="ppc">#include &lt;iomanip&gt;</span>
+<span class="ppc">#include &lt;cstdint&gt;</span>
+<span class="ppc">#include &lt;cstdio&gt;</span>
+<span class="ppc">#include &lt;string&gt;</span>
+<span class="ppc">#include &lt;cstring&gt;</span>
+<span class="ppc">#include &lt;algorithm&gt;</span>
+<span class="ppc">#include &lt;map&gt;</span>
+<span class="ppc">#include &lt;ext/pb_ds/assoc_container.hpp&gt;</span>
+<span class="ppc">#include &lt;future&gt;</span>
+<span class="ppc">#include &lt;unistd.h&gt;</span>
+
+<span class="kwb">unsigned char</span> tonum[<span class="num">256</span>],tochar[<span class="num">4</span>];
+<span class="kwb">static void</span> <span class="kwd">init</span>()
+{
+   tonum[<span class="str">&apos;A&apos;</span>] = <span class="num">0</span>;
+   tonum[<span class="str">&apos;C&apos;</span>] = <span class="num">1</span>;
+   tonum[<span class="str">&apos;T&apos;</span>] = <span class="num">2</span>;
+   tonum[<span class="str">&apos;G&apos;</span>] = <span class="num">3</span>;
+   tochar[<span class="num">0</span>] = <span class="str">&apos;A&apos;</span>;
+   tochar[<span class="num">1</span>] = <span class="str">&apos;C&apos;</span>;
+   tochar[<span class="num">2</span>] = <span class="str">&apos;T&apos;</span>;
+   tochar[<span class="num">3</span>] = <span class="str">&apos;G&apos;</span>;
+}
+
+<span class="kwb">struct</span> T{
+   <span class="kwd">T</span>(<span class="kwb">const</span> std::string&amp; s = std::<span class="kwd">string</span>())
+   :<span class="kwd">data</span>(<span class="num">0</span>),<span class="kwd">size</span>(s.<span class="kwd">size</span>())
+   {
+      <span class="kwd">reset</span>(s,<span class="num">0</span>,s.<span class="kwd">size</span>());
+   }
+   <span class="kwb">void</span> <span class="kwd">reset</span>(<span class="kwb">const</span> std::string&amp; s,<span class="kwb">unsigned</span> beg,<span class="kwb">unsigned</span> end)
+   {
+      size = end-beg;
+      data = <span class="num">0</span>;
+      <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = beg; i != end; ++i)
+      {
+         data &lt;&lt;= <span class="num">2</span>;
+         data |= tonum[<span class="kwb">unsigned</span>(s[i])];
+      }
+   }
+   <span class="kwb">bool</span> <span class="kwc">operator</span>&lt;(<span class="kwb">const</span> T&amp; in)<span class="kwb">const</span>
+   {
+      <span class="kwa">return</span> data &lt; in.data;
+   }
+   <span class="kwb">bool</span> <span class="kwc">operator</span>==(<span class="kwb">const</span> T&amp; in)<span class="kwb">const</span>
+   {
+      <span class="kwa">return</span> data == in.data;
+   }
+   <span class="kwc">operator</span> std::<span class="kwd">string</span>()<span class="kwb">const</span>
+   {
+      std::string tmp;
+      <span class="kwb">uint64_t</span> tmp1 = data;
+      <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = <span class="num">0</span>;i!=size;++i)
+      {
+         tmp+=tochar[tmp1 &amp; <span class="num">3</span>];
+         tmp1 &gt;&gt;= <span class="num">2</span>;
+      }
+      std::<span class="kwd">reverse</span>(tmp.<span class="kwd">begin</span>(),tmp.<span class="kwd">end</span>());
+      <span class="kwa">return</span> tmp;
+   }
+   <span class="kwb">struct</span> hash{
+   <span class="kwb">uint64_t</span> <span class="kwc">operator</span>()(<span class="kwb">const</span> T&amp; t)<span class="kwb">const</span>{ <span class="kwa">return</span> t.data; }
+   };
+   <span class="kwb">uint64_t</span> data;
+   <span class="kwb">unsigned char</span> size;
+};
+
+__gnu_pbds::cc_hash_table&lt;T,<span class="kwb">unsigned</span>,T::hash&gt;
+<span class="kwd">calculate</span>(<span class="kwb">const</span> std::string&amp; input,<span class="kwb">unsigned</span> size, <span class="kwb">unsigned</span> beg=<span class="num">0</span>,<span class="kwb">unsigned</span> incr=<span class="num">1</span>)
+{
+   __gnu_pbds::cc_hash_table&lt;T,<span class="kwb">unsigned</span>,T::hash&gt; frequencies;
+   T tmp;
+   <span class="kwa">for</span> (<span class="kwb">unsigned</span> i = beg, i_end = input.<span class="kwd">size</span>() + <span class="num">1</span> - size; i &lt; i_end; i+=incr)
+   {
+     tmp.<span class="kwd">reset</span>(input,i,i+size);
+      ++frequencies[tmp];
+   }
+   <span class="kwa">return</span> frequencies;
+}
+
+__gnu_pbds::cc_hash_table&lt;T,<span class="kwb">unsigned</span>,T::hash&gt;
+<span class="kwd">tcalculate</span>(<span class="kwb">const</span> std::string&amp; input,<span class="kwb">unsigned</span> size)
+{
+   <span class="kwb">unsigned</span> N = <span class="kwd">sysconf</span> (_SC_NPROCESSORS_ONLN);
+
+   std::future&lt;__gnu_pbds::cc_hash_table&lt;T,<span class="kwb">unsigned</span>,T::hash&gt;&gt; ft[N];
+   <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = <span class="num">0</span>; i&lt;N;++i)
+      ft[i] = std::<span class="kwd">async</span>(std::launch::async,calculate,std::<span class="kwd">ref</span>(input),size,i,N);
+
+   <span class="kwc">auto</span> frequencies = ft[<span class="num">0</span>].<span class="kwd">get</span>();
+
+   <span class="kwa">for</span>(<span class="kwb">unsigned</span> i = <span class="num">1</span> ; i&lt;N; ++i)
+      <span class="kwa">for</span>(<span class="kwc">auto</span>&amp; j : ft[i].<span class="kwd">get</span>())
+      {
+         frequencies[j.first]+=j.second;
+      }
+   <span class="kwa">return</span> frequencies;
+}
+
+<span class="kwb">void</span> <span class="kwd">write_frequencies</span>(<span class="kwb">const</span> std::string &amp; input, <span class="kwb">unsigned</span> size)
+{
+   <span class="kwb">unsigned</span> sum = input.<span class="kwd">size</span>() + <span class="num">1</span> - size;
+   <span class="kwc">auto</span> frequencies = <span class="kwd">tcalculate</span>(input,size);
+   std::map&lt;<span class="kwb">unsigned</span>, std::string,std::greater&lt;<span class="kwb">unsigned</span>&gt;&gt; freq;
+   <span class="kwa">for</span>(<span class="kwc">auto</span>&amp; i: frequencies)
+   {
+      freq.<span class="kwd">insert</span>(std::<span class="kwd">make_pair</span>(i.second,i.first));
+   }
+   <span class="kwa">for</span>(<span class="kwc">auto</span>&amp; i : freq)
+      std::cout &lt;&lt; i.second &lt;&lt; <span class="str">&apos; &apos;</span> &lt;&lt; (sum ? <span class="kwb">double</span>(<span class="num">100</span> * i.first) / sum : <span class="num">0.0</span>) &lt;&lt; <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+   std::cout &lt;&lt; <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+}
+
+<span class="kwb">void</span> <span class="kwd">write_count</span>(<span class="kwb">const</span> std::string &amp; input, <span class="kwb">const</span> std::string&amp; string)
+{
+   <span class="kwb">unsigned</span> size = string.<span class="kwd">size</span>();
+   <span class="kwc">auto</span> frequencies = <span class="kwd">tcalculate</span>(input,size);
+
+   std::cout &lt;&lt; frequencies[string] &lt;&lt; <span class="str">&apos;</span><span class="esc">\t</span><span class="str">&apos;</span> &lt;&lt; string &lt;&lt; <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+}
+
+<span class="kwb">int</span> <span class="kwd">main</span>()
+{
+   <span class="kwd">init</span>();
+   std::string input;
+   <span class="kwb">char</span> buffer[<span class="num">256</span>];
+   <span class="kwa">while</span> (<span class="kwd">fgets</span>(buffer,<span class="num">100</span>,stdin) &amp;&amp; <span class="kwd">memcmp</span>(<span class="str">&quot;&gt;THREE&quot;</span>,buffer,<span class="num">6</span>)!=<span class="num">0</span>);
+   <span class="kwa">while</span> (<span class="kwd">fgets</span>(buffer,<span class="num">100</span>,stdin) &amp;&amp; buffer[<span class="num">0</span>] != <span class="str">&apos;&gt;&apos;</span>)
+   {
+      <span class="kwa">if</span> (buffer[<span class="num">0</span>] != <span class="str">&apos;;&apos;</span>)
+      {
+         input.<span class="kwd">append</span>(buffer,<span class="kwd">strlen</span>(buffer)-<span class="num">1</span>);
+      }
+   }
+   std::<span class="kwd">transform</span>(input.<span class="kwd">begin</span>(),input.<span class="kwd">end</span>(),input.<span class="kwd">begin</span>(),::toupper);
+
+   std::cout &lt;&lt; std::<span class="kwd">setprecision</span>(<span class="num">3</span>) &lt;&lt; std::<span class="kwd">setiosflags</span>(std::ios::fixed);
+   <span class="kwd">write_frequencies</span>(input,<span class="num">1</span>);
+   <span class="kwd">write_frequencies</span>(input,<span class="num">2</span>);
+   <span class="kwd">write_count</span>(input, <span class="str">&quot;GGT&quot;</span>);
+   <span class="kwd">write_count</span>(input, <span class="str">&quot;GGTA&quot;</span>);
+   <span class="kwd">write_count</span>(input, <span class="str">&quot;GGTATT&quot;</span>);
+   <span class="kwd">write_count</span>(input, <span class="str">&quot;GGTATTTTAATT&quot;</span>);
+   <span class="kwd">write_count</span>(input, <span class="str">&quot;GGTATTTTAATTTATAGT&quot;</span>);
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 21:22:59 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -std=c++14 knucleotide.gpp-3.c++ -o knucleotide.gpp-3.c++.o &amp;&amp;  \
+        /usr/bin/g++ knucleotide.gpp-3.c++.o -o knucleotide.gpp-3.gpp_run -Wl,--no-as-needed -lpthread 
+rm knucleotide.gpp-3.c++
+
+4.33s to complete and log all make actions
+
+COMMAND LINE:
+./knucleotide.gpp-3.gpp_run 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide OCaml&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide OCaml&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">(* The Computer Language Benchmarks Game</span>
+<span class="com"> * https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"> *</span>
+<span class="com"> * contributed by Troestler Christophe</span>
+<span class="com"> * modified by Mauricio Fernandez</span>
+<span class="com"> * optimized by Fabrice Le Fessant</span>
+<span class="com"> * modified by Roman Kashitsyn: use Bytes instead of String</span>
+<span class="com"> *)</span>
+
+<span class="kwa">let</span> tab = <span class="kwc">Array</span>.make <span class="num">256 0</span>
+<span class="kwa">let</span> _ =
+  tab.(<span class="kwc">Char</span>.code &apos;<span class="kwd">A</span>&apos;) &lt;- <span class="num">0</span>;
+  tab.(<span class="kwc">Char</span>.code &apos;a&apos;) &lt;- <span class="num">0</span>;
+  tab.(<span class="kwc">Char</span>.code &apos;<span class="kwd">T</span>&apos;) &lt;- <span class="num">1</span>;
+  tab.(<span class="kwc">Char</span>.code &apos;t&apos;) &lt;- <span class="num">1</span>;
+  tab.(<span class="kwc">Char</span>.code &apos;<span class="kwd">C</span>&apos;) &lt;- <span class="num">2</span>;
+  tab.(<span class="kwc">Char</span>.code &apos;c&apos;) &lt;- <span class="num">2</span>;
+  tab.(<span class="kwc">Char</span>.code &apos;g&apos;) &lt;- <span class="num">3</span>;
+  tab.(<span class="kwc">Char</span>.code &apos;<span class="kwd">G</span>&apos;) &lt;- <span class="num">3</span>
+
+<span class="kwa">let</span> uppercase line =
+  <span class="kwa">let</span> len = <span class="kwc">Bytes</span>.length line <span class="kwa">in</span>
+  <span class="kwa">for</span> i = <span class="num">0</span> <span class="kwa">to</span> len - <span class="num">1</span> <span class="kwa">do</span>
+    <span class="kwa">let</span> c = <span class="kwc">Bytes</span>.get line i <span class="kwa">in</span>
+    <span class="kwc">Bytes</span>.set line i (<span class="kwc">Char</span>.unsafe_chr tab.(<span class="kwc">Char</span>.code c))
+  <span class="kwa">done</span>
+
+<span class="com">(* Extract DNA sequence &quot;THREE&quot; from stdin *)</span>
+<span class="kwa">let</span> dna =
+  <span class="kwa">let</span> is_not_three s = <span class="kwc">String</span>.length s &lt; <span class="num">6</span> || <span class="kwc">String</span>.sub s <span class="num">0 6</span> &lt;&gt; <span class="str">&quot;&gt;THREE&quot;</span> <span class="kwa">in</span>
+  <span class="kwa">while</span> is_not_three(input_line stdin) <span class="kwa">do</span> () <span class="kwa">done</span>;
+  <span class="kwa">let</span> buf = <span class="kwc">Buffer</span>.create <span class="num">130_000_000</span> <span class="kwa">in</span>
+  <span class="com">(* Skip possible comment *)</span>
+  (<span class="kwa">try</span>
+     <span class="kwa">while true do</span>
+       <span class="kwa">let</span> line = <span class="kwc">Bytes</span>.unsafe_of_string (input_line stdin) <span class="kwa">in</span>
+       <span class="kwa">if</span> <span class="kwc">Bytes</span>.get line <span class="num">0</span> &lt;&gt; &apos;;&apos; <span class="kwa">then begin</span>
+	 uppercase line;
+	 <span class="kwc">Buffer</span>.add_bytes buf line;
+	 raise <span class="kwd">Exit</span>
+       <span class="kwa">end</span>
+     <span class="kwa">done with</span> _ -&gt; ());
+  <span class="com">(* Read the DNA sequence *)</span>
+  (<span class="kwa">try while true do</span>
+       <span class="kwa">let</span> line = <span class="kwc">Bytes</span>.unsafe_of_string (input_line stdin) <span class="kwa">in</span>
+       <span class="kwa">if</span> <span class="kwc">Bytes</span>.get line <span class="num">0</span> = &apos;&gt;&apos; <span class="kwa">then</span> raise <span class="kwd">End_of_file</span>;
+       uppercase line;
+       <span class="kwc">Buffer</span>.add_bytes buf line
+     <span class="kwa">done with</span> <span class="kwd">End_of_file</span> -&gt; ());
+  <span class="kwc">Buffer</span>.contents buf
+
+
+<span class="kwa">module</span> <span class="kwd">K15</span> = <span class="kwa">struct</span>
+  <span class="kwa">type</span> t = <span class="kwb">int</span>
+  <span class="kwa">let</span> equal k1 k2 = k1 = k2
+  <span class="kwa">let</span> hash n = n
+<span class="kwa">end</span>
+
+<span class="kwa">module</span> <span class="kwd">K16</span> = <span class="kwa">struct</span>
+  <span class="kwa">type</span> t = <span class="kwb">int</span> * <span class="kwb">int</span>
+  <span class="kwa">let</span> equal (a1,a2) (b1,b2) = a1 = b1 &amp;&amp; a2 = b2
+  <span class="kwa">let</span> hash (a1, _) = a1
+<span class="kwa">end</span>
+
+<span class="kwa">type</span> entry = {
+  <span class="kwa">mutable</span> count : <span class="kwb">int</span>;
+}
+
+<span class="kwa">let</span> threshold15 =
+  <span class="kwa">match</span> <span class="kwc">Sys</span>.word_size <span class="kwa">with</span>
+    <span class="num">32</span> -&gt; <span class="num">15</span>
+  | <span class="num">64</span> -&gt; <span class="num">31</span>
+  | _ -&gt; <span class="kwa">assert false</span>
+<span class="kwa">let</span> threshold16 = threshold15 + <span class="num">1</span>
+
+<span class="kwa">let</span> c = <span class="num">0x40000</span>-<span class="num">1</span>
+<span class="kwa">module</span> <span class="kwd">H15</span> = <span class="kwc">Hashtbl</span>.<span class="kwd">Make</span>(<span class="kwd">K15</span>)
+<span class="kwa">module</span> <span class="kwd">H16</span> = <span class="kwc">Hashtbl</span>.<span class="kwd">Make</span>(<span class="kwd">K16</span>)
+<span class="kwa">let</span> h15 = <span class="kwc">H15</span>.create c
+<span class="kwa">let</span> h16 = <span class="kwc">H16</span>.create c
+
+<span class="kwa">let rec</span> pack_word n k h =
+  <span class="kwa">let</span> b = <span class="kwc">Char</span>.code dna.[n] <span class="kwa">in</span>
+  <span class="kwa">let</span> h = h * <span class="num">4</span> + b <span class="kwa">in</span>
+  <span class="kwa">if</span> k &gt; <span class="num">1</span> <span class="kwa">then</span>
+    pack_word (n+<span class="num">1</span>) (k-<span class="num">1</span>) h
+  <span class="kwa">else</span> h
+
+<span class="kwa">let</span> pack15 k n =
+  pack_word n k <span class="num">0</span>
+
+<span class="kwa">let</span> pack16 k n =
+  <span class="kwa">let</span> h1 = pack_word n threshold15 <span class="num">0</span> <span class="kwa">in</span>
+  <span class="kwa">let</span> h2 = pack_word (n+ threshold15) (k- threshold15) <span class="num">0</span> <span class="kwa">in</span>
+  (h1, h2)
+
+<span class="kwa">let rec</span> pack_word_in dna n k h =
+  <span class="kwa">let</span> b = dna.[n] <span class="kwa">in</span>
+  <span class="kwa">let</span> b = tab.(<span class="kwc">Char</span>.code b) <span class="kwa">in</span>
+  <span class="kwa">let</span> h = h * <span class="num">4</span> + b <span class="kwa">in</span>
+  <span class="kwa">if</span> k &gt; <span class="num">1</span> <span class="kwa">then</span>
+    pack_word_in dna (n+<span class="num">1</span>) (k-<span class="num">1</span>) h
+  <span class="kwa">else</span> h
+
+<span class="kwa">let</span> pack_key15 seq =
+  <span class="kwa">let</span> k = <span class="kwc">String</span>.length seq <span class="kwa">in</span>
+  pack_word_in seq <span class="num">0</span> k <span class="num">0</span>
+
+<span class="kwa">let</span> pack_key16 seq =
+  <span class="kwa">let</span> k = <span class="kwc">String</span>.length seq <span class="kwa">in</span>
+  <span class="kwa">let</span> h1 = pack_word_in seq <span class="num">0</span> threshold15 <span class="num">0</span> <span class="kwa">in</span>
+  <span class="kwa">let</span> h2 = pack_word_in seq threshold15 (k- threshold15) <span class="num">0</span> <span class="kwa">in</span>
+  (h1, h2)
+
+<span class="kwa">let</span> char = [| &apos;<span class="kwd">A</span>&apos;; &apos;<span class="kwd">T</span>&apos;; &apos;<span class="kwd">C</span>&apos;; &apos;<span class="kwd">G</span>&apos; |]
+
+<span class="kwa">let rec</span> unpack h s pos k =
+  <span class="kwa">let</span> pos = pos - <span class="num">1</span> <span class="kwa">in</span>
+  <span class="kwc">Bytes</span>.set s pos char.(h <span class="kwa">land</span> <span class="num">3</span>);
+  <span class="kwa">if</span> k &gt; <span class="num">1</span> <span class="kwa">then</span>
+    unpack (h <span class="kwa">lsr</span> <span class="num">2</span>) s pos (k-<span class="num">1</span>)
+
+<span class="kwa">let</span> unpack15 k h1 =
+  <span class="kwa">let</span> s = <span class="kwc">Bytes</span>.create k <span class="kwa">in</span>
+  unpack h1 s k k;
+  <span class="kwc">Bytes</span>.unsafe_to_string s
+
+<span class="kwa">let</span> unpack16 k (h1, h2) =
+  <span class="kwa">let</span> s = <span class="kwc">Bytes</span>.create k <span class="kwa">in</span>
+  unpack h1 s threshold15 threshold15;
+  unpack h2 s k (k- threshold15);
+  <span class="kwc">Bytes</span>.unsafe_to_string s
+
+<span class="kwa">let</span> count15 k =
+  <span class="kwa">for</span> i = <span class="num">0</span> <span class="kwa">to</span> <span class="kwc">String</span>.length dna - k - <span class="num">1</span> <span class="kwa">do</span>
+    <span class="kwa">let</span> packed = pack15 k i <span class="kwa">in</span>
+    <span class="kwa">try</span>
+      <span class="kwa">let</span> key = <span class="kwc">H15</span>.find h15 packed <span class="kwa">in</span>
+      key.count &lt;- key.count + <span class="num">1</span>
+    <span class="kwa">with</span> <span class="kwd">Not_found</span> -&gt;
+      <span class="kwc">H15</span>.add h15 packed { count = <span class="num">1</span> }
+  <span class="kwa">done</span>
+
+<span class="kwa">let</span> count16 k =
+  <span class="kwa">for</span> i = <span class="num">0</span> <span class="kwa">to</span> <span class="kwc">String</span>.length dna - k - <span class="num">1</span> <span class="kwa">do</span>
+    <span class="kwa">let</span> packed = pack16 k i <span class="kwa">in</span>
+    <span class="kwa">try</span>
+      <span class="kwa">let</span> key = <span class="kwc">H16</span>.find h16 packed <span class="kwa">in</span>
+      key.count &lt;- key.count + <span class="num">1</span>
+    <span class="kwa">with</span> <span class="kwd">Not_found</span> -&gt;
+      <span class="kwc">H16</span>.add h16 packed { count = <span class="num">1</span> }
+  <span class="kwa">done</span>
+
+<span class="kwa">let</span> count k =
+  <span class="kwa">if</span> k &lt; threshold16 <span class="kwa">then</span> count15 k <span class="kwa">else</span> count16 k
+
+<span class="kwa">let</span> compare_freq ((k1:<span class="kwb">string</span>),(f1:<span class="kwb">float</span>)) (k2, f2) =
+  <span class="kwa">if</span> f1 &gt; f2 <span class="kwa">then</span> -<span class="num">1</span> <span class="kwa">else if</span> f1 &lt; f2 <span class="kwa">then</span> <span class="num">1</span> <span class="kwa">else</span> <span class="kwc">String</span>.compare k1 k2
+
+<span class="kwa">let</span> write_frequencies15 k =
+  count15 k;
+  <span class="kwa">let</span> tot = <span class="kwb">float</span>(<span class="kwc">H15</span>.fold (<span class="kwa">fun</span> _ n t -&gt; n.count + t) h15 <span class="num">0</span>) <span class="kwa">in</span>
+  <span class="kwa">let</span> frq =
+    <span class="kwc">H15</span>.fold (<span class="kwa">fun</span> h n l -&gt;
+	(unpack15 k h, <span class="num">100</span>. *. <span class="kwb">float</span> n.count /. tot) :: l) h15 [] <span class="kwa">in</span>
+  <span class="kwa">let</span> frq = <span class="kwc">List</span>.sort compare_freq frq <span class="kwa">in</span>
+  <span class="kwc">String</span>.concat <span class="str">&quot;&quot;</span>
+    (<span class="kwc">List</span>.map (<span class="kwa">fun</span> (k,f) -&gt; <span class="kwc">Printf</span>.sprintf <span class="str">&quot;</span><span class="ipl">%s</span> <span class="str">%.3f</span><span class="esc">\n</span><span class="str">&quot;</span> k f) frq)
+
+<span class="kwa">let</span> write_frequencies16 k =
+  count16 k;
+  <span class="kwa">let</span> tot = <span class="kwb">float</span>(<span class="kwc">H16</span>.fold (<span class="kwa">fun</span> _ n t -&gt; n.count + t) h16 <span class="num">0</span>) <span class="kwa">in</span>
+  <span class="kwa">let</span> frq =
+    <span class="kwc">H16</span>.fold (<span class="kwa">fun</span> h n l -&gt;
+	(unpack16 k h, <span class="num">100</span>. *. <span class="kwb">float</span> n.count /. tot) :: l) h16 [] <span class="kwa">in</span>
+  <span class="kwa">let</span> frq = <span class="kwc">List</span>.sort compare_freq frq <span class="kwa">in</span>
+  <span class="kwc">String</span>.concat <span class="str">&quot;&quot;</span>
+    (<span class="kwc">List</span>.map (<span class="kwa">fun</span> (k,f) -&gt; <span class="kwc">Printf</span>.sprintf <span class="str">&quot;</span><span class="ipl">%s</span> <span class="str">%.3f</span><span class="esc">\n</span><span class="str">&quot;</span> k f) frq)
+
+<span class="kwa">let</span> write_count15 k seq =
+  count15 k;
+  <span class="kwc">Printf</span>.sprintf <span class="str">&quot;</span><span class="ipl">%d</span><span class="str"></span><span class="esc">\t</span><span class="str"></span><span class="ipl">%s</span><span class="str">&quot;</span> (<span class="kwa">try</span> (<span class="kwc">H15</span>.find h15 (pack_key15 seq)).count <span class="kwa">with</span> <span class="kwd">Not_found</span> -&gt; <span class="num">0</span>) seq
+
+<span class="kwa">let</span> write_count16 k seq =
+  count16 k;
+  <span class="kwc">Printf</span>.sprintf <span class="str">&quot;</span><span class="ipl">%d</span><span class="str"></span><span class="esc">\t</span><span class="str"></span><span class="ipl">%s</span><span class="str">&quot;</span> (<span class="kwa">try</span> (<span class="kwc">H16</span>.find h16 (pack_key16 seq)).count <span class="kwa">with</span> <span class="kwd">Not_found</span> -&gt; <span class="num">0</span>) seq
+
+<span class="kwa">let</span> write_frequencies k =
+  <span class="kwa">if</span> k &lt; threshold16 <span class="kwa">then</span> write_frequencies15 k
+  <span class="kwa">else</span> write_frequencies16 k
+
+<span class="kwa">let</span> write_count seq =
+  <span class="kwa">let</span> k = <span class="kwc">String</span>.length seq <span class="kwa">in</span>
+  <span class="kwa">if</span> k &lt; threshold16 <span class="kwa">then</span> write_count15 k seq
+  <span class="kwa">else</span> write_count16 k seq
+
+<span class="kwa">type</span> t = <span class="kwd">Size</span> <span class="kwa">of</span> <span class="kwb">int</span> | <span class="kwd">Dna</span> <span class="kwa">of</span> <span class="kwb">string</span>
+
+<span class="kwa">let</span> invoke (f : t -&gt; <span class="kwb">string</span>) x : <span class="kwb">unit</span> -&gt; <span class="kwb">string</span> =
+  <span class="kwa">let</span> input, output = <span class="kwc">Unix</span>.pipe() <span class="kwa">in</span>
+  <span class="kwa">match</span> <span class="kwc">Unix</span>.fork() <span class="kwa">with</span>
+  | -<span class="num">1</span> -&gt; <span class="kwc">Unix</span>.close input; <span class="kwc">Unix</span>.close output; (<span class="kwa">let</span> v = f x <span class="kwa">in fun</span> () -&gt; v)
+  | <span class="num">0</span> -&gt;
+    <span class="kwc">Unix</span>.close input;
+    <span class="kwa">let</span> output = <span class="kwc">Unix</span>.out_channel_of_descr output <span class="kwa">in</span>
+    <span class="kwc">Marshal</span>.to_channel output (f x) [];
+    close_out output;
+    exit <span class="num">0</span>
+  | pid -&gt;
+    <span class="kwc">Unix</span>.close output;
+    <span class="kwa">let</span> input = <span class="kwc">Unix</span>.in_channel_of_descr input <span class="kwa">in fun</span> () -&gt;
+      <span class="kwa">let</span> v = <span class="kwc">Marshal</span>.from_channel input <span class="kwa">in</span>
+      ignore (<span class="kwc">Unix</span>.waitpid [] pid);
+      close_in input;
+      v
+
+<span class="kwa">let</span> parallelize f l =
+  <span class="kwa">let</span> list = <span class="kwc">List</span>.map (invoke f) (<span class="kwc">List</span>.rev l) <span class="kwa">in</span>
+  <span class="kwc">List</span>.iter (<span class="kwa">fun</span> g -&gt; print_endline (g ())) (<span class="kwc">List</span>.rev list)
+
+<span class="kwa">let</span> () =
+  parallelize
+    (<span class="kwa">fun</span> i -&gt;
+       <span class="kwa">match</span> i <span class="kwa">with</span>
+	 <span class="kwd">Size</span> i -&gt;
+         write_frequencies i
+       | <span class="kwd">Dna</span> k -&gt;
+         write_count k
+    ) [<span class="kwd">Size</span> <span class="num">1</span>;
+       <span class="kwd">Size</span> <span class="num">2</span>;
+       <span class="kwd">Dna</span> <span class="str">&quot;GGT&quot;</span>;
+       <span class="kwd">Dna</span> <span class="str">&quot;GGTA&quot;</span>;
+       <span class="kwd">Dna</span> <span class="str">&quot;GGTATT&quot;</span>;
+       <span class="kwd">Dna</span> <span class="str">&quot;GGTATTTTAATT&quot;</span>;
+       <span class="kwd">Dna</span> <span class="str">&quot;GGTATTTTAATTTATAGT&quot;</span>]
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+OCaml native-code
+version 4.13.1
+
+
+Tue, 11 Jan 2022 20:47:06 GMT
+
+MAKE:
+mv knucleotide.ocaml-3.ocaml knucleotide.ocaml-3.ml
+~/.opam/4.13.1/bin/ocamlopt -noassert -unsafe -fPIC -nodynlink -inline 100 -O3 unix.cmxa -ccopt -march=ivybridge knucleotide.ocaml-3.ml -o knucleotide.ocaml-3.ocaml_run
+rm knucleotide.ocaml-3.ml
+
+1.33s to complete and log all make actions
+
+COMMAND LINE:
+./knucleotide.ocaml-3.ocaml_run 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

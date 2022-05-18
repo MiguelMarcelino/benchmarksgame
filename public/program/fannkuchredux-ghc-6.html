@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>fannkuch-redux Haskell GHC&nbsp;#6 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>fannkuch-redux Haskell GHC&nbsp;#6 program</h1>
+    <aside>
+      <p><a href="../description/fannkuchredux.html#fannkuchredux">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">{-</span>
+<span class="com">The Computer Language Benchmarks Game</span>
+<span class="com"></span>
+<span class="com">https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">Contributed by Branimir Maksimovic.</span>
+<span class="com">Optimized/rewritten by Bryan O&apos;Sullivan.</span>
+<span class="com">Parallelized and rewritten by James Brock.</span>
+<span class="com"></span>
+<span class="com">Build:</span>
+<span class="com">ghc --make -fllvm -O2 -threaded -XBangPatterns -XScopedTypeVariables -rtsopts fannkuch-redux.hs -o fannkuch-redux</span>
+<span class="com"></span>
+<span class="com">Run 1-Core:</span>
+<span class="com">fannkuch-redux +RTS -N1 -RTS 12</span>
+<span class="com"></span>
+<span class="com">Run 4-Core:</span>
+<span class="com">fannkuch-redux +RTS -N4 -RTS 12</span>
+<span class="com">-}</span>
+
+<span class="kwd">module</span> Main(main) <span class="kwd">where</span>
+
+<span class="kwd">import</span> System.Environment
+<span class="kwd">import</span> Data.Bits
+<span class="kwd">import</span> Data.List
+<span class="kwd">import</span> Control.Monad
+<span class="kwd">import</span> Control.Concurrent
+<span class="kwd">import</span> Control.Concurrent.Async
+
+<span class="kwd">import qualified</span> Data.Vector.Unboxed.Mutable <span class="kwd">as</span> VM
+<span class="kwd">import qualified</span> Data.Vector.Generic.Mutable <span class="kwd">as</span> VG
+
+
+main :: <span class="kwb">IO</span> ()
+main = <span class="kwd">do</span>
+    n &lt;- <span class="kwc">readIO</span> . <span class="kwc">head</span> =&lt;&lt; <span class="kwc">getArgs</span>
+
+    (maxFlipsCount, checkSum) &lt;- fannkuch n
+
+    <span class="kwc">putStr</span> $ <span class="kwc">unlines</span>
+        [ <span class="kwc">show</span> checkSum
+        , <span class="str">&quot;Pfannkuchen(&quot;</span> ++ <span class="kwc">show</span> n ++ <span class="str">&quot;) = &quot;</span> ++ <span class="kwc">show</span> maxFlipsCount
+        ]
+
+
+fannkuch
+    :: <span class="kwb">Int</span>
+        <span class="slc">-- ^ n, the size of the fannkuch-redux problem.</span>
+    -&gt; <span class="kwb">IO</span> (<span class="kwb">Int</span>, <span class="kwb">Int</span>)
+        <span class="slc">-- ^ (max flips count, checksum)</span>
+fannkuch !n = <span class="kwd">do</span>
+
+    <span class="slc">-- Number of permutations to consider.</span>
+    <span class="kwd">let</span> numPermutations = factorial n
+
+    <span class="slc">-- Number of cores available for work.</span>
+    numCapabilities &lt;- getNumCapabilities
+
+    <span class="slc">-- The amount of work which we would like to give to each core.</span>
+    <span class="kwd">let</span> workSize = <span class="kwc">max</span> <span class="num">1000</span> $ numPermutations `<span class="kwc">div</span>` numCapabilities
+
+    <span class="slc">-- Divide up the permutations into workSize units</span>
+    <span class="kwd">let</span> workBoundary = <span class="kwc">takeWhile</span> (&lt;=numPermutations) $ <span class="kwc">iterate</span> (+workSize) <span class="num">1</span>
+
+    <span class="slc">-- Upper and lower permutation index bounds for each workSize unit</span>
+    <span class="kwd">let</span> workRanges = <span class="kwc">zip</span> workBoundary $ <span class="kwc">tail</span> workBoundary ++ [numPermutations+<span class="num">1</span>]
+
+    <span class="slc">-- Perform the work.</span>
+    results &lt;- mapConcurrently (<span class="kwc">uncurry</span> $ work n) workRanges
+
+    <span class="slc">-- Gather up the results and return.</span>
+    <span class="kwc">return</span> $ <span class="kwc">foldl1</span>&apos; (\(fc0,cs0) (fc1,cs1) -&gt; (<span class="kwc">max</span> fc0 fc1, cs0+cs1)) results
+
+
+<span class="slc">-- | Basic tail-call factorial. Never called on the hot path of this program.</span>
+factorial :: <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span>
+factorial z0 = go z0 <span class="num">1</span>
+  <span class="kwd">where</span>
+    go <span class="num">1</span> !answer = answer
+    go !z !answer = go (z-<span class="num">1</span>) (answer*z)
+
+
+<span class="slc">-- | Work function which counts flips and calculates checksum for a range of</span>
+<span class="slc">-- permutations.</span>
+work
+    :: <span class="kwb">Int</span>
+        <span class="slc">-- ^ n, The size of the fannkuch-redux problem.</span>
+    -&gt; <span class="kwb">Int</span>
+        <span class="slc">-- ^ Lower bound inclusive of the permutation indices for this work.</span>
+    -&gt; <span class="kwb">Int</span>
+        <span class="slc">-- ^ Upper bound exclusive of the permutation indices for this work.</span>
+    -&gt; <span class="kwb">IO</span> (<span class="kwb">Int</span>, <span class="kwb">Int</span>)
+        <span class="slc">-- ^ (max flips count, checksum)</span>
+work !n !permIndexBegin !permIndexEnd = <span class="kwd">do</span>
+
+    <span class="slc">-- Allocate mutable vector memory in the worker thread. Hopefully no two</span>
+    <span class="slc">-- threads will allocate mutable vectors which share a cache line.</span>
+
+    <span class="slc">-- Permutation vector.</span>
+    perm  :: VM.IOVector <span class="kwb">Int</span> &lt;- VM.unsafeNew n
+
+    <span class="slc">-- Working temporary permutation vector.</span>
+    tperm :: VM.IOVector <span class="kwb">Int</span> &lt;- VM.unsafeNew n
+
+    <span class="slc">-- Count vector.</span>
+    <span class="slc">--</span>
+    <span class="slc">-- &gt; To optimize the process I use an intermediate data structure,</span>
+    <span class="slc">-- &gt; count[], which keeps count of how many rotations have been done</span>
+    <span class="slc">-- &gt; at every level.</span>
+    count :: VM.IOVector <span class="kwb">Int</span> &lt;- VM.unsafeNew n
+
+    <span class="slc">-- Initialize the perm and count vectors.</span>
+    permIndex n permIndexBegin perm count
+
+    <span class="slc">-- Preserve these mutually-recursive loop and count_flips functions</span>
+    <span class="slc">-- from fannkuch-redux Haskell GHC #4 because they seem unimprovably fast.</span>
+    <span class="kwd">let</span>
+        loop
+            :: <span class="kwb">Int</span> <span class="slc">-- c,  checksum</span>
+            -&gt; <span class="kwb">Int</span> <span class="slc">-- m,  flip count</span>
+            -&gt; <span class="kwb">Int</span> <span class="slc">-- pc, permutation index</span>
+            -&gt; <span class="kwb">IO</span>(<span class="kwb">Int</span>,<span class="kwb">Int</span>)
+        loop !c !m !pc
+            | pc == (permIndexEnd-<span class="num">1</span>) = <span class="kwc">return</span> (m, c)
+            | <span class="kwc">otherwise</span> = <span class="kwd">do</span>
+                permNext n perm count
+                VM.unsafeCopy tperm perm
+                <span class="kwd">let</span> count_flips :: <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> (<span class="kwb">Int</span>, <span class="kwb">Int</span>)
+                    count_flips !flips = <span class="com">{-# SCC &quot;count_flips&quot; #-}</span> <span class="kwd">do</span>
+                        f &lt;- VM.unsafeRead tperm <span class="num">0</span>
+                        <span class="kwd">if</span> f == <span class="num">1</span>
+                        <span class="kwd">then</span> loop
+                                (c + (<span class="kwd">if</span> pc .&amp;. <span class="num">1</span> == <span class="num">0</span> <span class="kwd">then</span> flips <span class="kwd">else</span> -flips))
+                                (<span class="kwc">max</span> m flips)
+                                (pc+<span class="num">1</span>)
+                        <span class="kwd">else do</span>
+                            VG.<span class="kwc">reverse</span> $ VM.unsafeSlice <span class="num">0</span> f tperm
+                            count_flips (flips+<span class="num">1</span>)
+                count_flips <span class="num">0</span>
+    loop <span class="num">0 0</span> (permIndexBegin-<span class="num">1</span>)
+
+
+<span class="slc">-- | Generate the next permutation vector and count vector.</span>
+permNext
+    :: <span class="kwb">Int</span> <span class="slc">-- ^ Permutation length.</span>
+    -&gt; VM.IOVector <span class="kwb">Int</span> <span class="slc">-- ^ Vector to be mutated to next permutation.</span>
+    -&gt; VM.IOVector <span class="kwb">Int</span> <span class="slc">-- ^ count vector for recursion depth state.</span>
+    -&gt; <span class="kwb">IO</span> ()
+permNext !n !perm !count = go <span class="num">1</span>
+  <span class="kwd">where</span>
+    go
+        :: <span class="kwb">Int</span> <span class="slc">-- ^ i loops over [1..n-1]</span>
+        -&gt; <span class="kwb">IO</span> ()
+    go !i
+        | i &gt;= n    = <span class="kwc">return</span> ()
+        | <span class="kwc">otherwise</span> = <span class="kwd">do</span>
+
+            <span class="slc">-- left-rotate the first i+1 places of perm</span>
+            rotateLeft perm $ i+<span class="num">1</span>
+
+            counti &lt;- VM.unsafeRead count i
+            <span class="kwd">if</span> counti &gt;= i
+            <span class="kwd">then do</span>
+                VM.unsafeWrite count i <span class="num">0</span>
+                go $ i+<span class="num">1</span>
+            <span class="kwd">else do</span>
+                VM.unsafeWrite count i $ counti+<span class="num">1</span>
+                <span class="kwc">return</span> ()
+
+
+<span class="slc">-- | From a permutation index, generate permutation vector and count vector.</span>
+<span class="slc">--</span>
+<span class="slc">-- &gt; It should be clear now how to generate a permutation and corresponding</span>
+<span class="slc">-- &gt; count[] array from an arbitrary index. Basically,</span>
+<span class="slc">-- &gt;</span>
+<span class="slc">-- &gt; count[k] = ( index % (k+1)! ) / k!</span>
+<span class="slc">-- &gt;</span>
+<span class="slc">-- &gt; is the number of rotations we need to perform on elements 0..k.</span>
+<span class="slc">-- &gt; Doing it in the descending order from n-1 to 1 gives us both the count[]</span>
+<span class="slc">-- &gt; array and the permutation.</span>
+permIndex
+    :: <span class="kwb">Int</span> <span class="slc">-- ^ Permutation length.</span>
+    -&gt; <span class="kwb">Int</span> <span class="slc">-- ^ ith permutation index, 1-based.</span>
+    -&gt; VM.IOVector <span class="kwb">Int</span> <span class="slc">-- ^ Mutable permutation vector output.</span>
+    -&gt; VM.IOVector <span class="kwb">Int</span> <span class="slc">-- ^ Mutable count vector output.</span>
+    -&gt; <span class="kwb">IO</span> ()
+permIndex !n !i !perm !count = <span class="kwd">do</span>
+
+    <span class="slc">-- initialize perm to [1,2,..n]</span>
+    forM_ [<span class="num">0</span>..n-<span class="num">1</span>] (\k -&gt; VM.unsafeWrite perm k $ k + <span class="num">1</span>)
+
+    VM.unsafeWrite count <span class="num">0 0</span> <span class="slc">-- count[0] is always 0.</span>
+
+    <span class="slc">-- forM_ k = [n-1..1] over the count vector</span>
+    forM_ (<span class="kwc">take</span> (n-<span class="num">1</span>) $ <span class="kwc">iterate</span> (<span class="kwc">subtract</span> <span class="num">1</span>) (n-<span class="num">1</span>)) $ \ k -&gt; <span class="kwd">do</span>
+        <span class="kwd">let</span> countk = (i `<span class="kwc">mod</span>` factorial (k+<span class="num">1</span>)) `<span class="kwc">div</span>` factorial k
+        VM.unsafeWrite count k countk
+        replicateM_ countk $ rotateLeft perm $ k+<span class="num">1</span>
+
+
+<span class="slc">-- | Left-rotate the first i places of perm where i &gt;= 2.</span>
+rotateLeft
+    :: VM.IOVector <span class="kwb">Int</span>
+    -&gt; <span class="kwb">Int</span> <span class="slc">-- ^ Precondition: i &gt;= 2</span>
+    -&gt; <span class="kwb">IO</span> ()
+rotateLeft !perm !i = <span class="kwd">do</span>
+    !perm0 &lt;- VM.unsafeRead perm <span class="num">0</span>
+    VM.unsafeMove (VM.unsafeSlice <span class="num">0</span> (i-<span class="num">1</span>) perm) (VM.unsafeSlice <span class="num">1</span> (i-<span class="num">1</span>) perm)
+    VM.unsafeWrite perm (i-<span class="num">1</span>) perm0
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+The Glorious Glasgow Haskell
+Compilation System,
+version 9.2.1
+
+
+Tue, 25 Jan 2022 17:36:19 GMT
+
+MAKE:
+mv fannkuchredux.ghc-6.ghc fannkuchredux.ghc-6.hs
+~/.ghcup/ghc/9.2.1/bin/ghc --make -fllvm -O2 -XBangPatterns -threaded -rtsopts -XScopedTypeVariables fannkuchredux.ghc-6.hs -o fannkuchredux.ghc-6.ghc_run
+[1 of 1] Compiling Main             ( fannkuchredux.ghc-6.hs, fannkuchredux.ghc-6.o )
+Linking fannkuchredux.ghc-6.ghc_run ...
+rm fannkuchredux.ghc-6.hs
+
+11.66s to complete and log all make actions
+
+COMMAND LINE:
+./fannkuchredux.ghc-6.ghc_run +RTS -N4 -RTS 12
+
+PROGRAM OUTPUT:
+3968050
+Pfannkuchen(12) = 65
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

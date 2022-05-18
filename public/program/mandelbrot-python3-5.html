@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>mandelbrot Python 3&nbsp;#5 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>mandelbrot Python 3&nbsp;#5 program</h1>
+    <aside>
+      <p><a href="../description/mandelbrot.html#mandelbrot">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc"># The Computer Language Benchmarks Game</span>
+<span class="slc"># https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">#</span>
+<span class="slc"># contributed by Tupteq</span>
+<span class="slc"># modified by Simon Descarpentries</span>
+<span class="slc"># modified by Ivan Baldin</span>
+<span class="slc"># 2to3 plus Daniel Nanz fix</span>
+
+<span class="kwa">import</span> sys
+<span class="kwa">from</span> array <span class="kwa">import</span> array
+<span class="kwa">from</span> multiprocessing <span class="kwa">import</span> Pool
+
+<span class="kwa">def</span> <span class="kwd">do_row</span>(fy):
+    local_abs = <span class="kwb">abs</span>
+    two_over_size = <span class="num">2.0</span> / size
+    xr_offs = <span class="kwb">range</span>(<span class="num">7</span>, -<span class="num">1</span>, -<span class="num">1</span>)
+    xr_iter = <span class="kwb">range</span>(<span class="num">50</span>)
+
+    result = <span class="kwd">array</span>(<span class="str">&apos;B&apos;</span>)
+    <span class="kwa">for</span> x <span class="kwa">in</span> <span class="kwb">range</span>(<span class="num">7</span>, size, <span class="num">8</span>):
+        byte_acc = <span class="num">0</span>
+        <span class="kwa">for</span> offset <span class="kwa">in</span> xr_offs:
+            z = <span class="num">0</span>j
+            c = two_over_size * (x - offset) + fy
+
+            <span class="kwa">for</span> i <span class="kwa">in</span> xr_iter:
+                z = z * z + c
+                <span class="kwa">if</span> <span class="kwd">local_abs</span>(z) &gt;= <span class="num">2</span>:
+                    <span class="kwa">break</span>
+            <span class="kwa">else</span>:
+                byte_acc += <span class="num">1</span> &lt;&lt; offset
+
+        result.<span class="kwd">append</span>(byte_acc)
+
+    <span class="kwa">if</span> x != size - <span class="num">1</span>:
+        result.<span class="kwd">append</span>(byte_acc)
+
+    <span class="kwa">return</span> result.<span class="kwd">tostring</span>()
+
+<span class="kwa">def</span> <span class="kwd">main</span>(out):
+    out.<span class="kwd">write</span>((<span class="str">&apos;P4</span><span class="esc">\n</span><span class="str"></span><span class="ipl">%d %d</span><span class="str"></span><span class="esc">\n</span><span class="str">&apos;</span> % (size, size)).<span class="kwd">encode</span>(<span class="str">&apos;ASCII&apos;</span>))
+
+    pool = <span class="kwd">Pool</span>()
+    step = <span class="num">2.0</span>j / size
+    <span class="kwa">for</span> row <span class="kwa">in</span> pool.<span class="kwd">imap</span>(do_row, (step*y-(<span class="num">1.5</span>+<span class="num">1</span>j) <span class="kwa">for</span> y <span class="kwa">in</span> <span class="kwb">range</span>(size))):
+        out.<span class="kwd">write</span>(row)
+
+<span class="kwa">if</span> __name__ == <span class="str">&apos;__main__&apos;</span>:
+    size = <span class="kwb">int</span>(sys.argv[<span class="num">1</span>])
+    <span class="kwd">main</span>(sys.stdout.<span class="kwb">buffer</span>)
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+Python 3.10.1
+
+
+Fri, 14 Jan 2022 22:39:18 GMT
+
+MAKE:
+mv mandelbrot.python3-5.python3 mandelbrot.python3-5.py
+pytype .
+ninja: Entering directory `.pytype'
+[1/1] check mandelbrot.python3-5
+FAILED: /home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/.pytype/pyi/mandelbrot.python3-5.pyi 
+/usr/bin/python3 -m pytype.single --imports_info /home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/.pytype/imports/mandelbrot.python3-5.imports --module-name mandelbrot.python3-5 -V 3.9 -o /home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/.pytype/pyi/mandelbrot.python3-5.pyi --analyze-annotated --nofail --quick /home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/mandelbrot.python3-5.py
+File &quot;/home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/mandelbrot.python3-5.py&quot;, line 38, in do_row: No attribute 'tostring' on array.array[int] [attribute-error]
+
+For more details, see https://google.github.io/pytype/errors.html#attribute-error
+ninja: build stopped: subcommand failed.
+Computing dependencies
+Analyzing 1 sources with 0 local dependencies
+Leaving directory '.pytype'
+make: [/home/dunham/all-benchmarksgame/2000-benchmarksgame/nanobench/makefiles/u64q.programs.Makefile:375: mandelbrot.python3-5.python3_run] Error 1 (ignored)
+
+9.15s to complete and log all make actions
+
+COMMAND LINE:
+/opt/src/Python-3.10.1/bin/python3 -OO mandelbrot.python3-5.py 1000
+
+PROGRAM FAILED 
+
+
+(BINARY) PROGRAM OUTPUT NOT SHOWN
+
+multiprocessing.pool.RemoteTraceback: 
+&quot;&quot;&quot;
+Traceback (most recent call last):
+  File &quot;/opt/src/Python-3.10.1/lib/python3.10/multiprocessing/pool.py&quot;, line 125, in worker
+    result = (True, func(*args, **kwds))
+  File &quot;/home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/mandelbrot.python3-5.py&quot;, line 38, in do_row
+    return result.tostring()
+AttributeError: 'array.array' object has no attribute 'tostring'
+&quot;&quot;&quot;
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File &quot;/home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/mandelbrot.python3-5.py&quot;, line 50, in &lt;module&gt;
+    main(sys.stdout.buffer)
+  File &quot;/home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/mandelbrot.python3-5.py&quot;, line 45, in main
+    for row in pool.imap(do_row, (step*y-(1.5+1j) for y in range(size))):
+  File &quot;/opt/src/Python-3.10.1/lib/python3.10/multiprocessing/pool.py&quot;, line 870, in next
+    raise value
+AttributeError: 'array.array' object has no attribute 'tostring'
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

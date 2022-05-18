@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="all" />
+<meta name="description" content="Performance measurements for all the C# aot toy benchmark programs." />
+<title>C# aot measurements | Computer Language Benchmarks Game </title>
+<style><!--
+a{color:black;text-decoration:none}article,footer{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}code, h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}nav p{margin:0 .5em}ul{clear:left;margin:-0.3em 0 1.5em;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a,span{border-bottom: .1em solid #333;padding-bottom: .1em}.best{font-weight:bold}.message{font-size: .8em}table{color:#333;margin:1.3em auto 0;text-align:right}tbody::after{content:"-";display:block;line-height:2.6em;visibility:hidden}td{border-bottom: .15em dotted #eee;padding: .7em 0 0 1em}td a, th a{display:block}td:first-child,th:first-child{text-align:left;padding-left:0}th{font-weight:normal;padding:0 0 0 1em}@media only screen{th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(6),td:nth-child(6),th:nth-child(7),td:nth-child(7){display:none}}@media only screen and (min-width: 27em){th:nth-child(3),td:nth-child(3){display:table-cell}}@media only screen and (min-width: 38em){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(6),td:nth-child(6){display:table-cell}}@media only screen and (min-width: 47em){th:nth-child(7),td:nth-child(7){display:table-cell}}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>Benchmarks&nbsp;Game</a></h3>
+</header>
+
+<article>
+  <div>
+    <h1>all C# aot programs & measurements</h1>
+    <aside>
+      <p>File system caches and swap are cleared before measurements are made for each program — so each program has a similiar initial context. That makes the first measurements (the smallest N workload) different from later measurements.</a>
+    </aside>
+  </div>
+  <section>
+    <table>
+      <tbody>
+      <tr>
+        <td colspan="7" class="message"><p>.NET SDK 5.0.201<br/>
+Host Version: 5.0.4; Commit: f27d337295<br/>
+&lt;ServerGarbageCollection&gt;true&lt;/ServerGarbageCollection&gt;<br/>
+
+
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-7.html"><span>binary-trees&nbsp;&nbsp;#7</span></a>
+          <td>0.61
+          <td>&nbsp;7
+          <td>30,744
+          <td>694
+          <td>0.09
+          <td class="message">68%&nbsp;8%&nbsp;3%&nbsp;0%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-7.html"><span>binary-trees&nbsp;&nbsp;#7</span></a>
+          <td>0.16
+          <td>&nbsp;14
+          <td>33,644
+          <td>694
+          <td>0.21
+          <td class="message">63%&nbsp;38%&nbsp;27%&nbsp;25%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-7.html"><span>binary-trees&nbsp;&nbsp;#7</span></a>
+          <td>5.00
+          <td>&nbsp;21
+          <td>1,657,432
+          <td>694
+          <td>16.44
+          <td class="message">79%&nbsp;79%&nbsp;79%&nbsp;93%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-2.html"><span>binary-trees&nbsp;&nbsp;#2</span></a>
+          <td>0.58
+          <td>&nbsp;7
+          <td>29,268
+          <td>705
+          <td>0.09
+          <td class="message">53%&nbsp;5%&nbsp;4%&nbsp;15%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-2.html"><span>binary-trees&nbsp;&nbsp;#2</span></a>
+          <td>0.14
+          <td>&nbsp;14
+          <td>35,580
+          <td>705
+          <td>0.20
+          <td class="message">40%&nbsp;33%&nbsp;33%&nbsp;69%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-2.html"><span>binary-trees&nbsp;&nbsp;#2</span></a>
+          <td>4.82
+          <td>&nbsp;21
+          <td>1,661,716
+          <td>705
+          <td>15.39
+          <td class="message">79%&nbsp;77%&nbsp;83%&nbsp;85%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-1.html"><span>binary-trees&nbsp;</span></a>
+          <td>0.61
+          <td>&nbsp;7
+          <td>31,740
+          <td>657
+          <td>0.09
+          <td class="message">6%&nbsp;10%&nbsp;10%&nbsp;77%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-1.html"><span>binary-trees&nbsp;</span></a>
+          <td>0.15
+          <td>&nbsp;14
+          <td>42,040
+          <td>657
+          <td>0.19
+          <td class="message">40%&nbsp;23%&nbsp;77%&nbsp;36%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-1.html"><span>binary-trees&nbsp;</span></a>
+          <td>5.03
+          <td>&nbsp;21
+          <td>1,690,164
+          <td>657
+          <td>16.03
+          <td class="message">75%&nbsp;78%&nbsp;77%&nbsp;90%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-3.html"><span>binary-trees&nbsp;&nbsp;#3</span></a>
+          <td>0.67
+          <td>&nbsp;7
+          <td>31,532
+          <td>676
+          <td>0.11
+          <td class="message">6%&nbsp;7%&nbsp;53%&nbsp;18%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-3.html"><span>binary-trees&nbsp;&nbsp;#3</span></a>
+          <td>0.15
+          <td>&nbsp;14
+          <td>33,988
+          <td>676
+          <td>0.21
+          <td class="message">14%&nbsp;73%&nbsp;31%&nbsp;25%
+        <tr>
+          <td><a href="../program/binarytrees-csharpaot-3.html"><span>binary-trees&nbsp;&nbsp;#3</span></a>
+          <td>5.02
+          <td>&nbsp;21
+          <td>1,624,760
+          <td>676
+          <td>16.32
+          <td class="message">79%&nbsp;79%&nbsp;91%&nbsp;78%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fannkuchredux-csharpaot-9.html"><span>fannkuch-redux&nbsp;&nbsp;#9</span></a>
+          <td>0.65
+          <td>&nbsp;10
+          <td>30,644
+          <td>1225
+          <td>0.30
+          <td class="message">34%&nbsp;43%&nbsp;16%&nbsp;8%
+        <tr>
+          <td><a href="../program/fannkuchredux-csharpaot-9.html"><span>fannkuch-redux&nbsp;&nbsp;#9</span></a>
+          <td>0.74
+          <td>&nbsp;11
+          <td>30,976
+          <td>1225
+          <td>2.60
+          <td class="message">82%&nbsp;96%&nbsp;88%&nbsp;89%
+        <tr>
+          <td><a href="../program/fannkuchredux-csharpaot-9.html"><span>fannkuch-redux&nbsp;&nbsp;#9</span></a>
+          <td>8.40
+          <td>&nbsp;12
+          <td>31,128
+          <td>1225
+          <td>33.27
+          <td class="message">99%&nbsp;99%&nbsp;99%&nbsp;100%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fannkuchredux-csharpaot-6.html"><span>fannkuch-redux&nbsp;&nbsp;#6</span></a>
+          <td>0.61
+          <td>&nbsp;10
+          <td>30,576
+          <td>1068
+          <td>0.32
+          <td class="message">16%&nbsp;20%&nbsp;16%&nbsp;80%
+        <tr>
+          <td><a href="../program/fannkuchredux-csharpaot-6.html"><span>fannkuch-redux&nbsp;&nbsp;#6</span></a>
+          <td>0.80
+          <td>&nbsp;11
+          <td>30,276
+          <td>1068
+          <td>2.92
+          <td class="message">90%&nbsp;96%&nbsp;90%&nbsp;90%
+        <tr>
+          <td><a href="../program/fannkuchredux-csharpaot-6.html"><span>fannkuch-redux&nbsp;&nbsp;#6</span></a>
+          <td>9.62
+          <td>&nbsp;12
+          <td>30,740
+          <td>1068
+          <td>38.16
+          <td class="message">99%&nbsp;99%&nbsp;99%&nbsp;100%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fasta-csharpaot-5.html"><span>fasta&nbsp;&nbsp;#5</span></a>
+          <td>0.65
+          <td>&nbsp;250,000
+          <td>26,732
+          <td>1691
+          <td>0.14
+          <td class="message">6%&nbsp;65%&nbsp;8%&nbsp;13%
+        <tr>
+          <td><a href="../program/fasta-csharpaot-5.html"><span>fasta&nbsp;&nbsp;#5</span></a>
+          <td>0.20
+          <td>&nbsp;2,500,000
+          <td>48,112
+          <td>1691
+          <td>0.56
+          <td class="message">62%&nbsp;86%&nbsp;65%&nbsp;65%
+        <tr>
+          <td><a href="../program/fasta-csharpaot-5.html"><span>fasta&nbsp;&nbsp;#5</span></a>
+          <td>1.15
+          <td>&nbsp;25,000,000
+          <td>133,136
+          <td>1691
+          <td>4.35
+          <td class="message">94%&nbsp;98%&nbsp;95%&nbsp;93%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fasta-csharpaot-1.html"><span>fasta&nbsp;</span></a>
+          <td>0.66
+          <td>&nbsp;250,000
+          <td>34,660
+          <td>2098
+          <td>0.16
+          <td class="message">12%&nbsp;3%&nbsp;6%&nbsp;82%
+        <tr>
+          <td><a href="../program/fasta-csharpaot-1.html"><span>fasta&nbsp;</span></a>
+          <td>0.24
+          <td>&nbsp;2,500,000
+          <td>43,376
+          <td>2098
+          <td>0.66
+          <td class="message">92%&nbsp;67%&nbsp;61%&nbsp;57%
+        <tr>
+          <td><a href="../program/fasta-csharpaot-1.html"><span>fasta&nbsp;</span></a>
+          <td>1.40
+          <td>&nbsp;25,000,000
+          <td>52,032
+          <td>2098
+          <td>5.23
+          <td class="message">91%&nbsp;96%&nbsp;93%&nbsp;93%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/knucleotide-csharpaot-1.html"><span>k-nucleotide&nbsp;</span></a>
+          <td>0.73
+          <td>&nbsp;250,000
+          <td>57,748
+          <td>2044
+          <td>0.34
+          <td class="message">21%&nbsp;15%&nbsp;7%&nbsp;89%
+        <tr>
+          <td><a href="../program/knucleotide-csharpaot-1.html"><span>k-nucleotide&nbsp;</span></a>
+          <td>0.67
+          <td>&nbsp;2,500,000
+          <td>75,220
+          <td>2044
+          <td>1.26
+          <td class="message">33%&nbsp;50%&nbsp;50%&nbsp;92%
+        <tr>
+          <td><a href="../program/knucleotide-csharpaot-1.html"><span>k-nucleotide&nbsp;</span></a>
+          <td>3.30
+          <td>&nbsp;25,000,000
+          <td>183,524
+          <td>2044
+          <td>11.16
+          <td class="message">91%&nbsp;95%&nbsp;89%&nbsp;66%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/knucleotide-csharpaot-6.html"><span>k-nucleotide&nbsp;&nbsp;#6</span></a>
+          <td>0.79
+          <td>&nbsp;250,000
+          <td>60,504
+          <td>1603
+          <td>0.36
+          <td class="message">11%&nbsp;8%&nbsp;19%&nbsp;80%
+        <tr>
+          <td><a href="../program/knucleotide-csharpaot-6.html"><span>k-nucleotide&nbsp;&nbsp;#6</span></a>
+          <td>1.15
+          <td>&nbsp;2,500,000
+          <td>70,984
+          <td>1603
+          <td>1.88
+          <td class="message">70%&nbsp;57%&nbsp;32%&nbsp;58%
+        <tr>
+          <td><a href="../program/knucleotide-csharpaot-6.html"><span>k-nucleotide&nbsp;&nbsp;#6</span></a>
+          <td>6.18
+          <td>&nbsp;25,000,000
+          <td>183,840
+          <td>1603
+          <td>16.62
+          <td class="message">50%&nbsp;93%&nbsp;73%&nbsp;55%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-9.html"><span>mandelbrot&nbsp;&nbsp;#9</span></a>
+          <td>0.60
+          <td>&nbsp;1,000
+          <td>27,052
+          <td>816
+          <td>0.14
+          <td class="message">5%&nbsp;8%&nbsp;3%&nbsp;88%
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-9.html"><span>mandelbrot&nbsp;&nbsp;#9</span></a>
+          <td>0.29
+          <td>&nbsp;4,000
+          <td>34,256
+          <td>816
+          <td>0.86
+          <td class="message">93%&nbsp;72%&nbsp;69%&nbsp;67%
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-9.html"><span>mandelbrot&nbsp;&nbsp;#9</span></a>
+          <td>3.15
+          <td>&nbsp;16,000
+          <td>65,016
+          <td>816
+          <td>12.28
+          <td class="message">99%&nbsp;97%&nbsp;97%&nbsp;97%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-5.html"><span>mandelbrot&nbsp;&nbsp;#5</span></a>
+          <td>0.59
+          <td>&nbsp;1,000
+          <td>30,292
+          <td>839
+          <td>0.16
+          <td class="message">63%&nbsp;10%&nbsp;3%&nbsp;15%
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-5.html"><span>mandelbrot&nbsp;&nbsp;#5</span></a>
+          <td>0.35
+          <td>&nbsp;4,000
+          <td>31,772
+          <td>839
+          <td>1.11
+          <td class="message">75%&nbsp;91%&nbsp;78%&nbsp;74%
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-5.html"><span>mandelbrot&nbsp;&nbsp;#5</span></a>
+          <td>4.14
+          <td>&nbsp;16,000
+          <td>64,972
+          <td>839
+          <td>16.22
+          <td class="message">99%&nbsp;98%&nbsp;98%&nbsp;98%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-1.html"><span>mandelbrot&nbsp;</span></a>
+          <td>0.61
+          <td>&nbsp;1,000
+          <td>30,836
+          <td>1974
+          <td>0.14
+          <td class="message">7%&nbsp;10%&nbsp;2%&nbsp;85%
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-1.html"><span>mandelbrot&nbsp;</span></a>
+          <td>0.29
+          <td>&nbsp;4,000
+          <td>35,152
+          <td>1974
+          <td>0.86
+          <td class="message">70%&nbsp;72%&nbsp;87%&nbsp;71%
+        <tr>
+          <td><a href="../program/mandelbrot-csharpaot-1.html"><span>mandelbrot&nbsp;</span></a>
+          <td>3.15
+          <td>&nbsp;16,000
+          <td>65,056
+          <td>1974
+          <td>12.28
+          <td class="message">99%&nbsp;97%&nbsp;97%&nbsp;97%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-csharpaot-3.html"><span>n-body&nbsp;&nbsp;#3</span></a>
+          <td>0.66
+          <td>&nbsp;500,000
+          <td>32,540
+          <td>1305
+          <td>0.15
+          <td class="message">5%&nbsp;1%&nbsp;3%&nbsp;85%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-3.html"><span>n-body&nbsp;&nbsp;#3</span></a>
+          <td>0.77
+          <td>&nbsp;5,000,000
+          <td>32,668
+          <td>1305
+          <td>0.77
+          <td class="message">1%&nbsp;1%&nbsp;1%&nbsp;97%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-3.html"><span>n-body&nbsp;&nbsp;#3</span></a>
+          <td>6.93
+          <td>&nbsp;50,000,000
+          <td>33,008
+          <td>1305
+          <td>6.93
+          <td class="message">100%&nbsp;0%&nbsp;0%&nbsp;0%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-csharpaot-6.html"><span>n-body&nbsp;&nbsp;#6</span></a>
+          <td>0.68
+          <td>&nbsp;500,000
+          <td>32,992
+          <td>1742
+          <td>0.14
+          <td class="message">0%&nbsp;6%&nbsp;69%&nbsp;18%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-6.html"><span>n-body&nbsp;&nbsp;#6</span></a>
+          <td>0.56
+          <td>&nbsp;5,000,000
+          <td>32,788
+          <td>1742
+          <td>0.56
+          <td class="message">2%&nbsp;2%&nbsp;96%&nbsp;4%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-6.html"><span>n-body&nbsp;&nbsp;#6</span></a>
+          <td>4.86
+          <td>&nbsp;50,000,000
+          <td>33,136
+          <td>1742
+          <td>4.85
+          <td class="message">100%&nbsp;5%&nbsp;0%&nbsp;0%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-csharpaot-2.html"><span>n-body&nbsp;&nbsp;#2</span></a>
+          <td>0.72
+          <td>&nbsp;500,000
+          <td>32,724
+          <td>1343
+          <td>0.16
+          <td class="message">55%&nbsp;3%&nbsp;6%&nbsp;13%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-2.html"><span>n-body&nbsp;&nbsp;#2</span></a>
+          <td>0.79
+          <td>&nbsp;5,000,000
+          <td>32,656
+          <td>1343
+          <td>0.78
+          <td class="message">1%&nbsp;1%&nbsp;0%&nbsp;97%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-2.html"><span>n-body&nbsp;&nbsp;#2</span></a>
+          <td>7.07
+          <td>&nbsp;50,000,000
+          <td>32,920
+          <td>1343
+          <td>7.06
+          <td class="message">100%&nbsp;0%&nbsp;0%&nbsp;0%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-csharpaot-9.html"><span>n-body&nbsp;&nbsp;#9</span></a>
+          <td>0.70
+          <td>&nbsp;500,000
+          <td>32,796
+          <td>2125
+          <td>0.18
+          <td class="message">6%&nbsp;62%&nbsp;3%&nbsp;11%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-9.html"><span>n-body&nbsp;&nbsp;#9</span></a>
+          <td>0.48
+          <td>&nbsp;5,000,000
+          <td>32,984
+          <td>2125
+          <td>0.46
+          <td class="message">6%&nbsp;90%&nbsp;0%&nbsp;4%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-9.html"><span>n-body&nbsp;&nbsp;#9</span></a>
+          <td>3.85
+          <td>&nbsp;50,000,000
+          <td>33,408
+          <td>2125
+          <td>3.84
+          <td class="message">1%&nbsp;99%&nbsp;0%&nbsp;2%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-csharpaot-7.html"><span>n-body&nbsp;&nbsp;#7</span></a>
+          <td>0.66
+          <td>&nbsp;500,000
+          <td>32,684
+          <td>1704
+          <td>0.14
+          <td class="message">2%&nbsp;5%&nbsp;49%&nbsp;27%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-7.html"><span>n-body&nbsp;&nbsp;#7</span></a>
+          <td>0.57
+          <td>&nbsp;5,000,000
+          <td>32,620
+          <td>1704
+          <td>0.56
+          <td class="message">3%&nbsp;0%&nbsp;95%&nbsp;2%
+        <tr>
+          <td><a href="../program/nbody-csharpaot-7.html"><span>n-body&nbsp;&nbsp;#7</span></a>
+          <td>4.82
+          <td>&nbsp;50,000,000
+          <td>32,908
+          <td>1704
+          <td>4.82
+          <td class="message">0%&nbsp;0%&nbsp;100%&nbsp;5%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-4.html"><span>pidigits&nbsp;&nbsp;#4</span></a>
+          <td>0.60
+          <td>&nbsp;2,000
+          <td>30,976
+          <td>1121
+          <td>0.13
+          <td class="message">2%&nbsp;5%&nbsp;10%&nbsp;81%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-4.html"><span>pidigits&nbsp;&nbsp;#4</span></a>
+          <td>0.53
+          <td>&nbsp;6,000
+          <td>30,964
+          <td>1121
+          <td>0.53
+          <td class="message">2%&nbsp;0%&nbsp;96%&nbsp;4%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-4.html"><span>pidigits&nbsp;&nbsp;#4</span></a>
+          <td>1.37
+          <td>&nbsp;10,000
+          <td>31,424
+          <td>1121
+          <td>1.37
+          <td class="message">99%&nbsp;1%&nbsp;1%&nbsp;0%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-5.html"><span>pidigits&nbsp;&nbsp;#5</span></a>
+          <td>0.63
+          <td>&nbsp;2,000
+          <td>31,540
+          <td>977
+          <td>0.13
+          <td class="message">2%&nbsp;5%&nbsp;65%&nbsp;5%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-5.html"><span>pidigits&nbsp;&nbsp;#5</span></a>
+          <td>0.40
+          <td>&nbsp;6,000
+          <td>35,020
+          <td>977
+          <td>0.40
+          <td class="message">5%&nbsp;0%&nbsp;92%&nbsp;3%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-5.html"><span>pidigits&nbsp;&nbsp;#5</span></a>
+          <td>0.92
+          <td>&nbsp;10,000
+          <td>35,896
+          <td>977
+          <td>0.93
+          <td class="message">3%&nbsp;0%&nbsp;0%&nbsp;98%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-6.html"><span>pidigits&nbsp;&nbsp;#6</span></a>
+          <td>0.67
+          <td>&nbsp;2,000
+          <td>31,096
+          <td>1168
+          <td>0.11
+          <td class="message">16%&nbsp;4%&nbsp;7%&nbsp;80%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-6.html"><span>pidigits&nbsp;&nbsp;#6</span></a>
+          <td>0.39
+          <td>&nbsp;6,000
+          <td>31,168
+          <td>1168
+          <td>0.38
+          <td class="message">3%&nbsp;92%&nbsp;3%&nbsp;5%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-6.html"><span>pidigits&nbsp;&nbsp;#6</span></a>
+          <td>0.95
+          <td>&nbsp;10,000
+          <td>32,132
+          <td>1168
+          <td>0.95
+          <td class="message">1%&nbsp;1%&nbsp;98%&nbsp;2%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-7.html"><span>pidigits&nbsp;&nbsp;#7</span></a>
+          <td>0.94
+          <td>&nbsp;2,000
+          <td>50,896
+          <td>567
+          <td>0.51
+          <td class="message">48%&nbsp;13%&nbsp;10%&nbsp;16%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-7.html"><span>pidigits&nbsp;&nbsp;#7</span></a>
+          <td>3.43
+          <td>&nbsp;6,000
+          <td>52,216
+          <td>567
+          <td>3.85
+          <td class="message">22%&nbsp;33%&nbsp;26%&nbsp;32%
+        <tr>
+          <td><a href="../program/pidigits-csharpaot-7.html"><span>pidigits&nbsp;&nbsp;#7</span></a>
+          <td>9.50
+          <td>&nbsp;10,000
+          <td>52,216
+          <td>567
+          <td>10.70
+          <td class="message">20%&nbsp;29%&nbsp;33%&nbsp;29%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/regexredux-csharpaot-5.html"><span>regex-redux&nbsp;&nbsp;#5</span></a>
+          <td>0.68
+          <td>&nbsp;50,000
+          <td>35,728
+          <td>673
+          <td>0.24
+          <td class="message">72%&nbsp;7%&nbsp;6%&nbsp;15%
+        <tr>
+          <td><a href="../program/regexredux-csharpaot-5.html"><span>regex-redux&nbsp;&nbsp;#5</span></a>
+          <td>0.53
+          <td>&nbsp;500,000
+          <td>116,516
+          <td>673
+          <td>0.94
+          <td class="message">61%&nbsp;38%&nbsp;34%&nbsp;51%
+        <tr>
+          <td><a href="../program/regexredux-csharpaot-5.html"><span>regex-redux&nbsp;&nbsp;#5</span></a>
+          <td>3.09
+          <td>&nbsp;5,000,000
+          <td>1,303,296
+          <td>673
+          <td>7.62
+          <td class="message">74%&nbsp;73%&nbsp;55%&nbsp;49%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/regexredux-csharpaot-8.html"><span>regex-redux&nbsp;&nbsp;#8</span></a>
+          <td>0.75
+          <td>&nbsp;50,000
+          <td>36,792
+          <td>1869
+          <td>0.15
+          <td class="message">11%&nbsp;11%&nbsp;1%&nbsp;88%
+        <tr>
+          <td><a href="../program/regexredux-csharpaot-8.html"><span>regex-redux&nbsp;&nbsp;#8</span></a>
+          <td>0.29
+          <td>&nbsp;500,000
+          <td>59,588
+          <td>1869
+          <td>0.40
+          <td class="message">24%&nbsp;53%&nbsp;18%&nbsp;48%
+        <tr>
+          <td><a href="../program/regexredux-csharpaot-8.html"><span>regex-redux&nbsp;&nbsp;#8</span></a>
+          <td>1.42
+          <td>&nbsp;5,000,000
+          <td>291,104
+          <td>1869
+          <td>2.65
+          <td class="message">32%&nbsp;24%&nbsp;85%&nbsp;48%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-csharpaot-6.html"><span>reverse-complement&nbsp;&nbsp;#6</span></a>
+          <td>0.64
+          <td>&nbsp;250,000
+          <td>30,836
+          <td>1621
+          <td>0.16
+          <td class="message">13%&nbsp;8%&nbsp;3%&nbsp;86%
+        <tr>
+          <td><a href="../program/revcomp-csharpaot-6.html"><span>reverse-complement&nbsp;&nbsp;#6</span></a>
+          <td>1.56
+          <td>&nbsp;100,000,000
+          <td>1,029,568
+          <td>1621
+          <td>3.76
+          <td class="message">29%&nbsp;49%&nbsp;72%&nbsp;93%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-csharpaot-5.html"><span>reverse-complement&nbsp;&nbsp;#5</span></a>
+          <td>0.68
+          <td>&nbsp;250,000
+          <td>36,792
+          <td>1613
+          <td>0.14
+          <td class="message">6%&nbsp;19%&nbsp;11%&nbsp;75%
+        <tr>
+          <td><a href="../program/revcomp-csharpaot-5.html"><span>reverse-complement&nbsp;&nbsp;#5</span></a>
+          <td>2.80
+          <td>&nbsp;100,000,000
+          <td>1,032,516
+          <td>1613
+          <td>4.05
+          <td class="message">10%&nbsp;96%&nbsp;38%&nbsp;3%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-csharpaot-7.html"><span>reverse-complement&nbsp;&nbsp;#7</span></a>
+          <td>0.64
+          <td>&nbsp;250,000
+          <td>29,872
+          <td>1310
+          <td>0.18
+          <td class="message">16%&nbsp;17%&nbsp;0%&nbsp;81%
+        <tr>
+          <td><a href="../program/revcomp-csharpaot-7.html"><span>reverse-complement&nbsp;&nbsp;#7</span></a>
+          <td>1.48
+          <td>&nbsp;100,000,000
+          <td>957,104
+          <td>1310
+          <td>4.15
+          <td class="message">37%&nbsp;95%&nbsp;93%&nbsp;59%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/spectralnorm-csharpaot-5.html"><span>spectral-norm&nbsp;&nbsp;#5</span></a>
+          <td>0.62
+          <td>&nbsp;500
+          <td>32,848
+          <td>764
+          <td>0.12
+          <td class="message">57%&nbsp;2%&nbsp;11%&nbsp;15%
+        <tr>
+          <td><a href="../program/spectralnorm-csharpaot-5.html"><span>spectral-norm&nbsp;&nbsp;#5</span></a>
+          <td>0.32
+          <td>&nbsp;3,000
+          <td>33,596
+          <td>764
+          <td>0.97
+          <td class="message">71%&nbsp;69%&nbsp;71%&nbsp;94%
+        <tr>
+          <td><a href="../program/spectralnorm-csharpaot-5.html"><span>spectral-norm&nbsp;&nbsp;#5</span></a>
+          <td>0.82
+          <td>&nbsp;5,500
+          <td>34,720
+          <td>764
+          <td>2.98
+          <td class="message">96%&nbsp;90%&nbsp;89%&nbsp;89%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/spectralnorm-csharpaot-3.html"><span>spectral-norm&nbsp;&nbsp;#3</span></a>
+          <td>0.60
+          <td>&nbsp;500
+          <td>30,136
+          <td>878
+          <td>0.15
+          <td class="message">12%&nbsp;8%&nbsp;5%&nbsp;77%
+        <tr>
+          <td><a href="../program/spectralnorm-csharpaot-3.html"><span>spectral-norm&nbsp;&nbsp;#3</span></a>
+          <td>0.52
+          <td>&nbsp;3,000
+          <td>30,764
+          <td>878
+          <td>1.79
+          <td class="message">94%&nbsp;87%&nbsp;83%&nbsp;82%
+        <tr>
+          <td><a href="../program/spectralnorm-csharpaot-3.html"><span>spectral-norm&nbsp;&nbsp;#3</span></a>
+          <td>1.52
+          <td>&nbsp;5,500
+          <td>31,240
+          <td>878
+          <td>5.79
+          <td class="message">94%&nbsp;98%&nbsp;95%&nbsp;95%
+    </table>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../how-programs-are-measured.html"><span>How programs are measured</span></a>
+    </ul>
+  </nav>
+</footer>
+

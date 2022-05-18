@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="all" />
+<meta name="description" content="Performance measurements for all the Dart JIT toy benchmark programs." />
+<title>Dart JIT measurements (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article,footer{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}code, h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}nav p{margin:0 .5em}ul{clear:left;margin:-0.3em 0 1.5em;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a,span{border-bottom: .1em solid #333;padding-bottom: .1em}.best{font-weight:bold}.message{font-size: .8em}table{color:#333;margin:1.3em auto 0;text-align:right}tbody::after{content:"-";display:block;line-height:2.6em;visibility:hidden}td{border-bottom: .15em dotted #eee;padding: .7em 0 0 1em}td a, th a{display:block}td:first-child,th:first-child{text-align:left;padding-left:0}th{font-weight:normal;padding:0 0 0 1em}@media only screen{th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(6),td:nth-child(6),th:nth-child(7),td:nth-child(7){display:none}}@media only screen and (min-width: 27em){th:nth-child(3),td:nth-child(3){display:table-cell}}@media only screen and (min-width: 38em){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(6),td:nth-child(6){display:table-cell}}@media only screen and (min-width: 47em){th:nth-child(7),td:nth-child(7){display:table-cell}}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+
+<article>
+  <div>
+    <h1>all Dart JIT programs & measurements</h1>
+    <aside>
+      <p>File system caches and swap are cleared before measurements are made for each program — so each program has a similiar initial context. That makes the first measurements (the smallest N workload) different from later measurements.</a>
+    </aside>
+  </div>
+  <section>
+    <table>
+      <tbody>
+      <tr>
+        <td colspan="7" class="message"><p>Dart SDK version: 2.15.1 (stable)<br/>
+Tue Dec 14 13:32:21 2021
+
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-3.html"><span>binary-trees&nbsp;&nbsp;#3</span></a>
+          <td>2.44
+          <td>&nbsp;7
+          <td>130,580
+          <td>1212
+          <td>0.83
+          <td class="message">19%&nbsp;14%&nbsp;12%&nbsp;55%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-3.html"><span>binary-trees&nbsp;&nbsp;#3</span></a>
+          <td>0.43
+          <td>&nbsp;14
+          <td>170,008
+          <td>1212
+          <td>0.64
+          <td class="message">34%&nbsp;30%&nbsp;45%&nbsp;47%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-3.html"><span>binary-trees&nbsp;&nbsp;#3</span></a>
+          <td>27.77
+          <td>&nbsp;21
+          <td>1,663,108
+          <td>1212
+          <td>60.99
+          <td class="message">57%&nbsp;61%&nbsp;51%&nbsp;51%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-7.html"><span>binary-trees&nbsp;&nbsp;#7</span></a>
+          <td>2.26
+          <td>&nbsp;7
+          <td>133,528
+          <td>863
+          <td>0.85
+          <td class="message">32%&nbsp;12%&nbsp;8%&nbsp;33%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-7.html"><span>binary-trees&nbsp;&nbsp;#7</span></a>
+          <td>0.43
+          <td>&nbsp;14
+          <td>167,904
+          <td>863
+          <td>0.65
+          <td class="message">44%&nbsp;31%&nbsp;32%&nbsp;61%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-7.html"><span>binary-trees&nbsp;&nbsp;#7</span></a>
+          <td>14.01
+          <td>&nbsp;21
+          <td>598,200
+          <td>863
+          <td>33.75
+          <td class="message">55%&nbsp;65%&nbsp;59%&nbsp;63%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-4.html"><span>binary-trees&nbsp;&nbsp;#4</span></a>
+          <td>2.38
+          <td>&nbsp;7
+          <td>133,116
+          <td>1387
+          <td>0.76
+          <td class="message">26%&nbsp;22%&nbsp;15%&nbsp;36%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-4.html"><span>binary-trees&nbsp;&nbsp;#4</span></a>
+          <td>0.41
+          <td>&nbsp;14
+          <td>150,568
+          <td>1387
+          <td>0.61
+          <td class="message">32%&nbsp;38%&nbsp;53%&nbsp;29%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-4.html"><span>binary-trees&nbsp;&nbsp;#4</span></a>
+          <td>13.05
+          <td>&nbsp;21
+          <td>600,404
+          <td>1387
+          <td>31.08
+          <td class="message">62%&nbsp;59%&nbsp;64%&nbsp;56%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-5.html"><span>binary-trees&nbsp;&nbsp;#5</span></a>
+          <td>2.34
+          <td>&nbsp;7
+          <td>131,196
+          <td>1016
+          <td>0.75
+          <td class="message">23%&nbsp;9%&nbsp;14%&nbsp;52%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-5.html"><span>binary-trees&nbsp;&nbsp;#5</span></a>
+          <td>0.41
+          <td>&nbsp;14
+          <td>165,896
+          <td>1016
+          <td>0.60
+          <td class="message">63%&nbsp;27%&nbsp;30%&nbsp;42%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-5.html"><span>binary-trees&nbsp;&nbsp;#5</span></a>
+          <td>14.30
+          <td>&nbsp;21
+          <td>549,280
+          <td>1016
+          <td>35.06
+          <td class="message">60%&nbsp;64%&nbsp;61%&nbsp;62%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-6.html"><span>binary-trees&nbsp;&nbsp;#6</span></a>
+          <td>2.20
+          <td>&nbsp;7
+          <td>129,828
+          <td>482
+          <td>0.76
+          <td class="message">10%&nbsp;19%&nbsp;13%&nbsp;41%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-6.html"><span>binary-trees&nbsp;&nbsp;#6</span></a>
+          <td>0.47
+          <td>&nbsp;14
+          <td>153,592
+          <td>482
+          <td>0.62
+          <td class="message">17%&nbsp;52%&nbsp;40%&nbsp;32%
+        <tr>
+          <td><a href="../program/binarytrees-dartjit-6.html"><span>binary-trees&nbsp;&nbsp;#6</span></a>
+          <td>14.79
+          <td>&nbsp;21
+          <td>543,232
+          <td>482
+          <td>19.92
+          <td class="message">13%&nbsp;57%&nbsp;48%&nbsp;18%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-5.html"><span>fannkuch-redux&nbsp;&nbsp;#5</span></a>
+          <td>2.42
+          <td>&nbsp;10
+          <td>136,228
+          <td>1220
+          <td>1.21
+          <td class="message">25%&nbsp;20%&nbsp;21%&nbsp;34%
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-5.html"><span>fannkuch-redux&nbsp;&nbsp;#5</span></a>
+          <td>1.30
+          <td>&nbsp;11
+          <td>138,652
+          <td>1220
+          <td>3.87
+          <td class="message">73%&nbsp;72%&nbsp;78%&nbsp;80%
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-5.html"><span>fannkuch-redux&nbsp;&nbsp;#5</span></a>
+          <td>11.49
+          <td>&nbsp;12
+          <td>143,944
+          <td>1220
+          <td>43.94
+          <td class="message">96%&nbsp;95%&nbsp;96%&nbsp;96%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-3.html"><span>fannkuch-redux&nbsp;&nbsp;#3</span></a>
+          <td>2.58
+          <td>&nbsp;10
+          <td>130,344
+          <td>546
+          <td>1.01
+          <td class="message">11%&nbsp;17%&nbsp;21%&nbsp;31%
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-3.html"><span>fannkuch-redux&nbsp;&nbsp;#3</span></a>
+          <td>3.30
+          <td>&nbsp;11
+          <td>133,764
+          <td>546
+          <td>3.52
+          <td class="message">7%&nbsp;3%&nbsp;92%&nbsp;5%
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-3.html"><span>fannkuch-redux&nbsp;&nbsp;#3</span></a>
+          <td>41.11
+          <td>&nbsp;12
+          <td>133,936
+          <td>546
+          <td>41.33
+          <td class="message">99%&nbsp;1%&nbsp;1%&nbsp;0%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-2.html"><span>fannkuch-redux&nbsp;&nbsp;#2</span></a>
+          <td>2.53
+          <td>&nbsp;10
+          <td>130,252
+          <td>504
+          <td>1.11
+          <td class="message">18%&nbsp;13%&nbsp;19%&nbsp;64%
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-2.html"><span>fannkuch-redux&nbsp;&nbsp;#2</span></a>
+          <td>4.59
+          <td>&nbsp;11
+          <td>133,884
+          <td>504
+          <td>4.80
+          <td class="message">5%&nbsp;3%&nbsp;95%&nbsp;2%
+        <tr>
+          <td><a href="../program/fannkuchredux-dartjit-2.html"><span>fannkuch-redux&nbsp;&nbsp;#2</span></a>
+          <td>59.76
+          <td>&nbsp;12
+          <td>134,252
+          <td>504
+          <td>59.98
+          <td class="message">0%&nbsp;0%&nbsp;0%&nbsp;100%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fasta-dartjit-3.html"><span>fasta&nbsp;&nbsp;#3</span></a>
+          <td>2.45
+          <td>&nbsp;250,000
+          <td>137,728
+          <td>1108
+          <td>0.89
+          <td class="message">16%&nbsp;33%&nbsp;14%&nbsp;35%
+        <tr>
+          <td><a href="../program/fasta-dartjit-3.html"><span>fasta&nbsp;&nbsp;#3</span></a>
+          <td>1.02
+          <td>&nbsp;2,500,000
+          <td>160,152
+          <td>1108
+          <td>1.19
+          <td class="message">11%&nbsp;12%&nbsp;73%&nbsp;21%
+        <tr>
+          <td><a href="../program/fasta-dartjit-3.html"><span>fasta&nbsp;&nbsp;#3</span></a>
+          <td>6.13
+          <td>&nbsp;25,000,000
+          <td>297,088
+          <td>1108
+          <td>6.38
+          <td class="message">4%&nbsp;3%&nbsp;94%&nbsp;4%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fasta-dartjit-1.html"><span>fasta&nbsp;</span></a>
+          <td>2.45
+          <td>&nbsp;250,000
+          <td>138,208
+          <td>1402
+          <td>0.90
+          <td class="message">12%&nbsp;17%&nbsp;24%&nbsp;29%
+        <tr>
+          <td><a href="../program/fasta-dartjit-1.html"><span>fasta&nbsp;</span></a>
+          <td>0.95
+          <td>&nbsp;2,500,000
+          <td>150,920
+          <td>1402
+          <td>1.10
+          <td class="message">72%&nbsp;15%&nbsp;11%&nbsp;19%
+        <tr>
+          <td><a href="../program/fasta-dartjit-1.html"><span>fasta&nbsp;</span></a>
+          <td>5.40
+          <td>&nbsp;25,000,000
+          <td>169,080
+          <td>1402
+          <td>5.64
+          <td class="message">3%&nbsp;4%&nbsp;3%&nbsp;95%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fasta-dartjit-2.html"><span>fasta&nbsp;&nbsp;#2</span></a>
+          <td>2.66
+          <td>&nbsp;250,000
+          <td>136,600
+          <td>1068
+          <td>1.11
+          <td class="message">12%&nbsp;28%&nbsp;16%&nbsp;55%
+        <tr>
+          <td><a href="../program/fasta-dartjit-2.html"><span>fasta&nbsp;&nbsp;#2</span></a>
+          <td>2.49
+          <td>&nbsp;2,500,000
+          <td>146,508
+          <td>1068
+          <td>2.74
+          <td class="message">7%&nbsp;10%&nbsp;88%&nbsp;5%
+        <tr>
+          <td><a href="../program/fasta-dartjit-2.html"><span>fasta&nbsp;&nbsp;#2</span></a>
+          <td>13.60
+          <td>&nbsp;25,000,000
+          <td>147,584
+          <td>1068
+          <td>13.85
+          <td class="message">1%&nbsp;98%&nbsp;2%&nbsp;1%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fasta-dartjit-5.html"><span>fasta&nbsp;&nbsp;#5</span></a>
+          <td>2.41
+          <td>&nbsp;250,000
+          <td>136,792
+          <td>1485
+          <td>0.95
+          <td class="message">20%&nbsp;5%&nbsp;20%&nbsp;60%
+        <tr>
+          <td><a href="../program/fasta-dartjit-5.html"><span>fasta&nbsp;&nbsp;#5</span></a>
+          <td>0.80
+          <td>&nbsp;2,500,000
+          <td>160,744
+          <td>1485
+          <td>1.25
+          <td class="message">56%&nbsp;16%&nbsp;19%&nbsp;67%
+        <tr>
+          <td><a href="../program/fasta-dartjit-5.html"><span>fasta&nbsp;&nbsp;#5</span></a>
+          <td>4.39
+          <td>&nbsp;25,000,000
+          <td>371,712
+          <td>1485
+          <td>7.37
+          <td class="message">18%&nbsp;5%&nbsp;93%&nbsp;52%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/fasta-dartjit-4.html"><span>fasta&nbsp;&nbsp;#4</span></a>
+          <td>2.28
+          <td>&nbsp;250,000
+          <td>139,388
+          <td>1303
+          <td>0.89
+          <td class="message">13%&nbsp;10%&nbsp;17%&nbsp;58%
+        <tr>
+          <td><a href="../program/fasta-dartjit-4.html"><span>fasta&nbsp;&nbsp;#4</span></a>
+          <td>0.96
+          <td>&nbsp;2,500,000
+          <td>160,512
+          <td>1303
+          <td>1.17
+          <td class="message">18%&nbsp;71%&nbsp;21%&nbsp;15%
+        <tr>
+          <td><a href="../program/fasta-dartjit-4.html"><span>fasta&nbsp;&nbsp;#4</span></a>
+          <td>5.86
+          <td>&nbsp;25,000,000
+          <td>372,124
+          <td>1303
+          <td>6.40
+          <td class="message">94%&nbsp;9%&nbsp;3%&nbsp;3%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/knucleotide-dartjit-3.html"><span>k-nucleotide&nbsp;&nbsp;#3</span></a>
+          <td>2.89
+          <td>&nbsp;250,000
+          <td>357,616
+          <td>1520
+          <td>1.85
+          <td class="message">25%&nbsp;17%&nbsp;22%&nbsp;55%
+        <tr>
+          <td><a href="../program/knucleotide-dartjit-3.html"><span>k-nucleotide&nbsp;&nbsp;#3</span></a>
+          <td>2.78
+          <td>&nbsp;2,500,000
+          <td>334,964
+          <td>1520
+          <td>6.32
+          <td class="message">32%&nbsp;71%&nbsp;41%&nbsp;85%
+        <tr>
+          <td><a href="../program/knucleotide-dartjit-3.html"><span>k-nucleotide&nbsp;&nbsp;#3</span></a>
+          <td>19.51
+          <td>&nbsp;25,000,000
+          <td>330,112
+          <td>1520
+          <td>51.09
+          <td class="message">41%&nbsp;55%&nbsp;85%&nbsp;81%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/knucleotide-dartjit-1.html"><span>k-nucleotide&nbsp;</span></a>
+          <td>8.18
+          <td>&nbsp;250,000
+          <td>171,768
+          <td>623
+          <td>6.66
+          <td class="message">5%&nbsp;5%&nbsp;8%&nbsp;81%
+        <tr>
+          <td><a href="../program/knucleotide-dartjit-1.html"><span>k-nucleotide&nbsp;</span></a>
+          <td>57.28
+          <td>&nbsp;2,500,000
+          <td>215,152
+          <td>623
+          <td>57.55
+          <td class="message">1%&nbsp;99%&nbsp;1%&nbsp;0%
+        <tr>
+          <td><a href="../program/knucleotide-dartjit-1.html"><span>k-nucleotide&nbsp;</span></a>
+          <td>568.52
+          <td>&nbsp;25,000,000
+          <td>441,768
+          <td>623
+          <td>569.06
+          <td class="message">0%&nbsp;0%&nbsp;0%&nbsp;100%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-2.html"><span>mandelbrot&nbsp;&nbsp;#2</span></a>
+          <td>2.43
+          <td>&nbsp;1,000
+          <td>135,400
+          <td>488
+          <td>0.94
+          <td class="message">23%&nbsp;22%&nbsp;10%&nbsp;25%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-2.html"><span>mandelbrot&nbsp;&nbsp;#2</span></a>
+          <td>2.39
+          <td>&nbsp;4,000
+          <td>141,144
+          <td>488
+          <td>2.64
+          <td class="message">89%&nbsp;5%&nbsp;12%&nbsp;6%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-2.html"><span>mandelbrot&nbsp;&nbsp;#2</span></a>
+          <td>31.45
+          <td>&nbsp;16,000
+          <td>144,180
+          <td>488
+          <td>31.69
+          <td class="message">0%&nbsp;20%&nbsp;80%&nbsp;1%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-3.html"><span>mandelbrot&nbsp;&nbsp;#3</span></a>
+          <td>2.52
+          <td>&nbsp;1,000
+          <td>136,500
+          <td>614
+          <td>0.87
+          <td class="message">12%&nbsp;20%&nbsp;20%&nbsp;38%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-3.html"><span>mandelbrot&nbsp;&nbsp;#3</span></a>
+          <td>1.44
+          <td>&nbsp;4,000
+          <td>144,968
+          <td>614
+          <td>1.68
+          <td class="message">14%&nbsp;82%&nbsp;7%&nbsp;14%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-3.html"><span>mandelbrot&nbsp;&nbsp;#3</span></a>
+          <td>16.37
+          <td>&nbsp;16,000
+          <td>148,868
+          <td>614
+          <td>16.61
+          <td class="message">1%&nbsp;99%&nbsp;2%&nbsp;1%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-4.html"><span>mandelbrot&nbsp;&nbsp;#4</span></a>
+          <td>2.32
+          <td>&nbsp;1,000
+          <td>139,936
+          <td>982
+          <td>0.93
+          <td class="message">17%&nbsp;20%&nbsp;22%&nbsp;33%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-4.html"><span>mandelbrot&nbsp;&nbsp;#4</span></a>
+          <td>0.77
+          <td>&nbsp;4,000
+          <td>142,616
+          <td>982
+          <td>1.78
+          <td class="message">51%&nbsp;51%&nbsp;70%&nbsp;64%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-4.html"><span>mandelbrot&nbsp;&nbsp;#4</span></a>
+          <td>4.81
+          <td>&nbsp;16,000
+          <td>173,648
+          <td>982
+          <td>17.72
+          <td class="message">93%&nbsp;92%&nbsp;92%&nbsp;95%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-6.html"><span>mandelbrot&nbsp;&nbsp;#6</span></a>
+          <td>2.29
+          <td>&nbsp;1,000
+          <td>143,028
+          <td>907
+          <td>1.04
+          <td class="message">31%&nbsp;17%&nbsp;10%&nbsp;29%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-6.html"><span>mandelbrot&nbsp;&nbsp;#6</span></a>
+          <td>1.23
+          <td>&nbsp;4,000
+          <td>144,464
+          <td>907
+          <td>2.66
+          <td class="message">37%&nbsp;76%&nbsp;37%&nbsp;69%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-6.html"><span>mandelbrot&nbsp;&nbsp;#6</span></a>
+          <td>12.09
+          <td>&nbsp;16,000
+          <td>197,860
+          <td>907
+          <td>32.05
+          <td class="message">36%&nbsp;35%&nbsp;97%&nbsp;97%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-1.html"><span>mandelbrot&nbsp;</span></a>
+          <td>2.77
+          <td>&nbsp;1,000
+          <td>137,504
+          <td>454
+          <td>1.39
+          <td class="message">15%&nbsp;34%&nbsp;10%&nbsp;35%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-1.html"><span>mandelbrot&nbsp;</span></a>
+          <td>9.85
+          <td>&nbsp;4,000
+          <td>148,084
+          <td>454
+          <td>10.10
+          <td class="message">4%&nbsp;1%&nbsp;97%&nbsp;2%
+        <tr>
+          <td><a href="../program/mandelbrot-dartjit-1.html"><span>mandelbrot&nbsp;</span></a>
+          <td>151.26
+          <td>&nbsp;16,000
+          <td>148,144
+          <td>454
+          <td>151.50
+          <td class="message">100%&nbsp;0%&nbsp;0%&nbsp;0%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-dartjit-6.html"><span>n-body&nbsp;&nbsp;#6</span></a>
+          <td>2.35
+          <td>&nbsp;500,000
+          <td>132,036
+          <td>1311
+          <td>0.89
+          <td class="message">12%&nbsp;13%&nbsp;14%&nbsp;59%
+        <tr>
+          <td><a href="../program/nbody-dartjit-6.html"><span>n-body&nbsp;&nbsp;#6</span></a>
+          <td>1.29
+          <td>&nbsp;5,000,000
+          <td>132,120
+          <td>1311
+          <td>1.44
+          <td class="message">10%&nbsp;9%&nbsp;80%&nbsp;17%
+        <tr>
+          <td><a href="../program/nbody-dartjit-6.html"><span>n-body&nbsp;&nbsp;#6</span></a>
+          <td>9.43
+          <td>&nbsp;50,000,000
+          <td>135,296
+          <td>1311
+          <td>9.66
+          <td class="message">1%&nbsp;2%&nbsp;97%&nbsp;1%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-dartjit-2.html"><span>n-body&nbsp;&nbsp;#2</span></a>
+          <td>2.36
+          <td>&nbsp;500,000
+          <td>139,160
+          <td>1266
+          <td>0.94
+          <td class="message">19%&nbsp;24%&nbsp;16%&nbsp;16%
+        <tr>
+          <td><a href="../program/nbody-dartjit-2.html"><span>n-body&nbsp;&nbsp;#2</span></a>
+          <td>1.68
+          <td>&nbsp;5,000,000
+          <td>143,256
+          <td>1266
+          <td>1.92
+          <td class="message">12%&nbsp;8%&nbsp;83%&nbsp;14%
+        <tr>
+          <td><a href="../program/nbody-dartjit-2.html"><span>n-body&nbsp;&nbsp;#2</span></a>
+          <td>12.87
+          <td>&nbsp;50,000,000
+          <td>143,440
+          <td>1266
+          <td>13.13
+          <td class="message">1%&nbsp;1%&nbsp;2%&nbsp;98%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/nbody-dartjit-3.html"><span>n-body&nbsp;&nbsp;#3</span></a>
+          <td>3.50
+          <td>&nbsp;500,000
+          <td>133,604
+          <td>1407
+          <td>0.95
+          <td class="message">13%&nbsp;6%&nbsp;17%&nbsp;40%
+        <tr>
+          <td><a href="../program/nbody-dartjit-3.html"><span>n-body&nbsp;&nbsp;#3</span></a>
+          <td>1.33
+          <td>&nbsp;5,000,000
+          <td>133,252
+          <td>1407
+          <td>1.49
+          <td class="message">16%&nbsp;77%&nbsp;11%&nbsp;11%
+        <tr>
+          <td><a href="../program/nbody-dartjit-3.html"><span>n-body&nbsp;&nbsp;#3</span></a>
+          <td>9.57
+          <td>&nbsp;50,000,000
+          <td>136,500
+          <td>1407
+          <td>9.81
+          <td class="message">2%&nbsp;97%&nbsp;3%&nbsp;2%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/pidigits-dartjit-2.html"><span>pidigits&nbsp;&nbsp;#2</span></a>
+          <td>2.39
+          <td>&nbsp;2,000
+          <td>140,260
+          <td>489
+          <td>0.95
+          <td class="message">19%&nbsp;10%&nbsp;20%&nbsp;50%
+        <tr>
+          <td><a href="../program/pidigits-dartjit-2.html"><span>pidigits&nbsp;&nbsp;#2</span></a>
+          <td>1.49
+          <td>&nbsp;6,000
+          <td>142,300
+          <td>489
+          <td>1.79
+          <td class="message">9%&nbsp;22%&nbsp;74%&nbsp;19%
+        <tr>
+          <td><a href="../program/pidigits-dartjit-2.html"><span>pidigits&nbsp;&nbsp;#2</span></a>
+          <td>3.44
+          <td>&nbsp;10,000
+          <td>165,004
+          <td>489
+          <td>3.80
+          <td class="message">9%&nbsp;72%&nbsp;32%&nbsp;6%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/pidigits-dartjit-3.html"><span>pidigits&nbsp;&nbsp;#3</span></a>
+          <td>2.65
+          <td>&nbsp;2,000
+          <td>139,408
+          <td>488
+          <td>0.96
+          <td class="message">26%&nbsp;21%&nbsp;21%&nbsp;22%
+        <tr>
+          <td><a href="../program/pidigits-dartjit-3.html"><span>pidigits&nbsp;&nbsp;#3</span></a>
+          <td>1.66
+          <td>&nbsp;6,000
+          <td>142,340
+          <td>488
+          <td>1.96
+          <td class="message">17%&nbsp;19%&nbsp;83%&nbsp;16%
+        <tr>
+          <td><a href="../program/pidigits-dartjit-3.html"><span>pidigits&nbsp;&nbsp;#3</span></a>
+          <td>3.96
+          <td>&nbsp;10,000
+          <td>142,728
+          <td>488
+          <td>4.30
+          <td class="message">6%&nbsp;26%&nbsp;72%&nbsp;7%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/regexredux-dartjit-3.html"><span>regex-redux&nbsp;&nbsp;#3</span></a>
+          <td>2.56
+          <td>&nbsp;50,000
+          <td>151,612
+          <td>1055
+          <td>1.28
+          <td class="message">24%&nbsp;9%&nbsp;25%&nbsp;46%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-3.html"><span>regex-redux&nbsp;&nbsp;#3</span></a>
+          <td>1.10
+          <td>&nbsp;500,000
+          <td>256,164
+          <td>1055
+          <td>1.52
+          <td class="message">64%&nbsp;26%&nbsp;23%&nbsp;23%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-3.html"><span>regex-redux&nbsp;&nbsp;#3</span></a>
+          <td>5.48
+          <td>&nbsp;5,000,000
+          <td>620,256
+          <td>1055
+          <td>7.17
+          <td class="message">19%&nbsp;73%&nbsp;19%&nbsp;20%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/regexredux-dartjit-4.html"><span>regex-redux&nbsp;&nbsp;#4</span></a>
+          <td>2.57
+          <td>&nbsp;50,000
+          <td>148,144
+          <td>511
+          <td>1.05
+          <td class="message">20%&nbsp;13%&nbsp;24%&nbsp;36%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-4.html"><span>regex-redux&nbsp;&nbsp;#4</span></a>
+          <td>1.17
+          <td>&nbsp;500,000
+          <td>216,752
+          <td>511
+          <td>1.39
+          <td class="message">14%&nbsp;68%&nbsp;20%&nbsp;21%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-4.html"><span>regex-redux&nbsp;&nbsp;#4</span></a>
+          <td>5.70
+          <td>&nbsp;5,000,000
+          <td>587,848
+          <td>511
+          <td>6.13
+          <td class="message">88%&nbsp;4%&nbsp;10%&nbsp;6%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/regexredux-dartjit-2.html"><span>regex-redux&nbsp;&nbsp;#2</span></a>
+          <td>2.52
+          <td>&nbsp;50,000
+          <td>152,800
+          <td>663
+          <td>1.15
+          <td class="message">10%&nbsp;23%&nbsp;20%&nbsp;47%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-2.html"><span>regex-redux&nbsp;&nbsp;#2</span></a>
+          <td>1.24
+          <td>&nbsp;500,000
+          <td>204,740
+          <td>663
+          <td>1.54
+          <td class="message">21%&nbsp;66%&nbsp;21%&nbsp;18%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-2.html"><span>regex-redux&nbsp;&nbsp;#2</span></a>
+          <td>6.69
+          <td>&nbsp;5,000,000
+          <td>541,384
+          <td>663
+          <td>7.58
+          <td class="message">43%&nbsp;55%&nbsp;7%&nbsp;8%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/regexredux-dartjit-5.html"><span>regex-redux&nbsp;&nbsp;#5</span></a>
+          <td>2.44
+          <td>&nbsp;50,000
+          <td>151,804
+          <td>706
+          <td>1.12
+          <td class="message">20%&nbsp;25%&nbsp;17%&nbsp;24%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-5.html"><span>regex-redux&nbsp;&nbsp;#5</span></a>
+          <td>1.02
+          <td>&nbsp;500,000
+          <td>211,996
+          <td>706
+          <td>1.46
+          <td class="message">40%&nbsp;55%&nbsp;47%&nbsp;25%
+        <tr>
+          <td><a href="../program/regexredux-dartjit-5.html"><span>regex-redux&nbsp;&nbsp;#5</span></a>
+          <td>4.29
+          <td>&nbsp;5,000,000
+          <td>653,924
+          <td>706
+          <td>6.40
+          <td class="message">43%&nbsp;25%&nbsp;34%&nbsp;48%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-dartjit-1.html"><span>reverse-complement&nbsp;</span></a>
+          <td>2.47
+          <td>&nbsp;250,000
+          <td>138,420
+          <td>642
+          <td>0.88
+          <td class="message">23%&nbsp;10%&nbsp;22%&nbsp;17%
+        <tr>
+          <td><a href="../program/revcomp-dartjit-1.html"><span>reverse-complement&nbsp;</span></a>
+          <td>6.71
+          <td>&nbsp;100,000,000
+          <td>1,105,644
+          <td>642
+          <td>7.81
+          <td class="message">12%&nbsp;46%&nbsp;54%&nbsp;30%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-dartjit-3.html"><span>reverse-complement&nbsp;&nbsp;#3</span></a>
+          <td>2.57
+          <td>&nbsp;250,000
+          <td>197,556
+          <td>563
+          <td>1.01
+          <td class="message">17%&nbsp;17%&nbsp;22%&nbsp;38%
+        <tr>
+          <td><a href="../program/revcomp-dartjit-3.html"><span>reverse-complement&nbsp;&nbsp;#3</span></a>
+          <td>42.75
+          <td>&nbsp;100,000,000
+          <td>6,573,204
+          <td>563
+          <td>46.58
+          <td class="message">50%&nbsp;43%&nbsp;6%&nbsp;9%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-dartjit-5.html"><span>reverse-complement&nbsp;&nbsp;#5</span></a>
+          <td>2.57
+          <td>&nbsp;250,000
+          <td>139,600
+          <td>933
+          <td>0.91
+          <td class="message">21%&nbsp;18%&nbsp;22%&nbsp;43%
+        <tr>
+          <td><a href="../program/revcomp-dartjit-5.html"><span>reverse-complement&nbsp;&nbsp;#5</span></a>
+          <td>5.53
+          <td>&nbsp;100,000,000
+          <td>2,099,348
+          <td>933
+          <td>9.05
+          <td class="message">72%&nbsp;27%&nbsp;34%&nbsp;29%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-dartjit-2.html"><span>reverse-complement&nbsp;&nbsp;#2</span></a>
+          <td>2.52
+          <td>&nbsp;250,000
+          <td>220,016
+          <td>568
+          <td>1.07
+          <td class="message">15%&nbsp;12%&nbsp;21%&nbsp;41%
+        <tr>
+          <td><a href="../program/revcomp-dartjit-2.html"><span>reverse-complement&nbsp;&nbsp;#2</span></a>
+          <td>58.10
+          <td>&nbsp;100,000,000
+          <td>6,584,868
+          <td>568
+          <td>62.23
+          <td class="message">5%&nbsp;7%&nbsp;34%&nbsp;61%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/revcomp-dartjit-4.html"><span>reverse-complement&nbsp;&nbsp;#4</span></a>
+          <td>2.56
+          <td>&nbsp;250,000
+          <td>172,960
+          <td>880
+          <td>0.97
+          <td class="message">15%&nbsp;13%&nbsp;21%&nbsp;42%
+        <tr>
+          <td><a href="../program/revcomp-dartjit-4.html"><span>reverse-complement&nbsp;&nbsp;#4</span></a>
+          <td>124.67
+          <td>&nbsp;100,000,000
+          <td>1,136,596
+          <td>880
+          <td>125.87
+          <td class="message">9%&nbsp;9%&nbsp;75%&nbsp;14%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-6.html"><span>spectral-norm&nbsp;&nbsp;#6</span></a>
+          <td>2.32
+          <td>&nbsp;500
+          <td>143,428
+          <td>1196
+          <td>0.89
+          <td class="message">21%&nbsp;14%&nbsp;15%&nbsp;46%
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-6.html"><span>spectral-norm&nbsp;&nbsp;#6</span></a>
+          <td>0.87
+          <td>&nbsp;3,000
+          <td>145,236
+          <td>1196
+          <td>2.33
+          <td class="message">67%&nbsp;62%&nbsp;71%&nbsp;78%
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-6.html"><span>spectral-norm&nbsp;&nbsp;#6</span></a>
+          <td>1.97
+          <td>&nbsp;5,500
+          <td>177,080
+          <td>1196
+          <td>6.62
+          <td class="message">84%&nbsp;90%&nbsp;81%&nbsp;83%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-2.html"><span>spectral-norm&nbsp;&nbsp;#2</span></a>
+          <td>2.35
+          <td>&nbsp;500
+          <td>144,284
+          <td>1168
+          <td>1.05
+          <td class="message">14%&nbsp;24%&nbsp;9%&nbsp;68%
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-2.html"><span>spectral-norm&nbsp;&nbsp;#2</span></a>
+          <td>1.71
+          <td>&nbsp;3,000
+          <td>183,456
+          <td>1168
+          <td>5.00
+          <td class="message">74%&nbsp;72%&nbsp;71%&nbsp;78%
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-2.html"><span>spectral-norm&nbsp;&nbsp;#2</span></a>
+          <td>4.27
+          <td>&nbsp;5,500
+          <td>180,864
+          <td>1168
+          <td>14.82
+          <td class="message">88%&nbsp;88%&nbsp;85%&nbsp;87%
+      <tbody>
+        <tr>
+          <th>source
+          <th>secs
+          <th>N
+          <th>mem
+          <th>gz
+          <th>cpu
+          <th>cpu load
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-1.html"><span>spectral-norm&nbsp;</span></a>
+          <td>2.36
+          <td>&nbsp;500
+          <td>132,392
+          <td>461
+          <td>0.82
+          <td class="message">22%&nbsp;16%&nbsp;9%&nbsp;34%
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-1.html"><span>spectral-norm&nbsp;</span></a>
+          <td>1.95
+          <td>&nbsp;3,000
+          <td>135,500
+          <td>461
+          <td>2.18
+          <td class="message">7%&nbsp;11%&nbsp;8%&nbsp;86%
+        <tr>
+          <td><a href="../program/spectralnorm-dartjit-1.html"><span>spectral-norm&nbsp;</span></a>
+          <td>5.68
+          <td>&nbsp;5,500
+          <td>138,168
+          <td>461
+          <td>5.90
+          <td class="message">2%&nbsp;3%&nbsp;96%&nbsp;4%
+    </table>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../how-programs-are-measured.html"><span>How programs are measured</span></a>
+    </ul>
+  </nav>
+</footer>
+

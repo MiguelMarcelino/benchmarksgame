@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>mandelbrot Java program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>mandelbrot Java program</h1>
+    <aside>
+      <p><a href="../description/mandelbrot.html#mandelbrot">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com">   contributed by Stefan Krause</span>
+<span class="com">   slightly modified by Chad Whipkey</span>
+<span class="com">*/</span>
+
+<span class="kwa">import</span> java.io.IOException;
+<span class="kwa">import</span> java.io.PrintStream;
+
+<span class="kwa">class</span> mandelbrot {
+
+   <span class="kwa">public static</span> <span class="kwb">void</span> <span class="kwd">main</span>(String[] args) <span class="kwa">throws</span> Exception {
+       <span class="kwa">new</span> <span class="kwd">Mandelbrot</span>(Integer.<span class="kwd">parseInt</span>(args[<span class="num">0</span>])).<span class="kwd">compute</span>();
+   }
+
+   <span class="kwa">public static class</span> Mandelbrot {
+       <span class="kwa">private static final</span> <span class="kwb">int</span> BUFFER_SIZE = <span class="num">8192</span>;
+
+       <span class="kwa">public</span> <span class="kwd">Mandelbrot</span>(<span class="kwb">int</span> size) {
+         <span class="kwa">this</span>.size = size;
+         fac = <span class="num">2.0</span> / size;
+         out = System.out;
+         shift = size % <span class="num">8</span> == <span class="num">0</span> ? <span class="num">0</span> : (<span class="num">8</span>- size % <span class="num">8</span>);
+      }
+      <span class="kwa">final</span> <span class="kwb">int</span> size;
+      <span class="kwa">final</span> PrintStream out;
+      <span class="kwa">final</span> <span class="kwb">byte</span> [] buf = <span class="kwa">new</span> <span class="kwb">byte</span>[BUFFER_SIZE];
+      <span class="kwb">int</span> bufLen = <span class="num">0</span>;
+      <span class="kwa">final</span> <span class="kwb">double</span> fac;
+      <span class="kwa">final</span> <span class="kwb">int</span> shift;
+
+      <span class="kwa">public</span> <span class="kwb">void</span> <span class="kwd">compute</span>() <span class="kwa">throws</span> IOException
+      {
+         out.<span class="kwd">format</span>(<span class="str">&quot;P4</span><span class="esc">\n</span><span class="str">%d %d</span><span class="esc">\n</span><span class="str">&quot;</span>,size,size);
+         <span class="kwa">for</span> (<span class="kwb">int</span> y = <span class="num">0</span>; y&lt;size; y++)
+            <span class="kwd">computeRow</span>(y);
+         out.<span class="kwd">write</span>( buf, <span class="num">0</span>, bufLen);
+         out.<span class="kwd">close</span>();
+      }
+
+      <span class="kwa">private</span> <span class="kwb">void</span> <span class="kwd">computeRow</span>(<span class="kwb">int</span> y) <span class="kwa">throws</span> IOException
+      {
+         <span class="kwb">int</span> bits = <span class="num">0</span>;
+
+         <span class="kwa">final</span> <span class="kwb">double</span> Ci = (y*fac - <span class="num">1.0</span>);
+          <span class="kwa">final</span> <span class="kwb">byte</span>[] bufLocal = buf;
+          <span class="kwa">for</span> (<span class="kwb">int</span> x = <span class="num">0</span>; x&lt;size;x++) {
+            <span class="kwb">double</span> Zr = <span class="num">0.0</span>;
+            <span class="kwb">double</span> Zi = <span class="num">0.0</span>;
+            <span class="kwb">double</span> Cr = (x*fac - <span class="num">1.5</span>);
+            <span class="kwb">int</span> i = <span class="num">50</span>;
+            <span class="kwb">double</span> ZrN = <span class="num">0</span>;
+            <span class="kwb">double</span> ZiN = <span class="num">0</span>;
+            <span class="kwa">do</span> {
+               Zi = <span class="num">2.0</span> * Zr * Zi + Ci;
+               Zr = ZrN - ZiN + Cr;
+               ZiN = Zi * Zi;
+               ZrN = Zr * Zr;
+            } <span class="kwa">while</span> (!(ZiN + ZrN &gt; <span class="num">4.0</span>) &amp;&amp; --i &gt; <span class="num">0</span>);
+
+            bits = bits &lt;&lt; <span class="num">1</span>;
+            <span class="kwa">if</span> (i == <span class="num">0</span>) bits++;
+
+            <span class="kwa">if</span> (x%<span class="num">8</span> == <span class="num">7</span>) {
+                bufLocal[bufLen++] = (<span class="kwb">byte</span>) bits;
+                <span class="kwa">if</span> ( bufLen == BUFFER_SIZE) {
+                    out.<span class="kwd">write</span>(bufLocal, <span class="num">0</span>, BUFFER_SIZE);
+                    bufLen = <span class="num">0</span>;
+                }
+               bits = <span class="num">0</span>;
+            }
+         }
+         <span class="kwa">if</span> (shift!=<span class="num">0</span>) {
+            bits = bits &lt;&lt; shift;
+            bufLocal[bufLen++] = (<span class="kwb">byte</span>) bits;
+            <span class="kwa">if</span> ( bufLen == BUFFER_SIZE) {
+                out.<span class="kwd">write</span>(bufLocal, <span class="num">0</span>, BUFFER_SIZE);
+                bufLen = <span class="num">0</span>;
+            }
+         }
+      }
+   }
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+openjdk 18 2022-03-22
+OpenJDK Runtime Environment
+(build 18+36-2087)
+OpenJDK 64-Bit Server VM
+(build 18+36-2087,
+mixed mode, sharing)
+
+
+Tue, 22 Mar 2022 18:06:23 GMT
+
+MAKE:
+mv mandelbrot.java mandelbrot.java
+mv: 'mandelbrot.java' and 'mandelbrot.java' are the same file
+make: [/home/dunham/all-benchmarksgame/2000-benchmarksgame/nanobench/makefiles/u64q.programs.Makefile:263: mandelbrot.java_run] Error 1 (ignored)
+/opt/src/jdk-18/bin/javac -d . -cp . mandelbrot.java
+
+1.64s to complete and log all make actions
+
+COMMAND LINE:
+/opt/src/jdk-18/bin/java  -cp . mandelbrot 16000
+
+(BINARY) PROGRAM OUTPUT NOT SHOWN
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

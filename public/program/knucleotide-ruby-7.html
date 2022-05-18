@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide Ruby&nbsp;#7 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide Ruby&nbsp;#7 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc"># The Computer Language Benchmarks Game</span>
+<span class="slc"># https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">#</span>
+<span class="slc"># contributed by Aaron Tavistock</span>
+
+<span class="kwa">def</span> <span class="kwd">find_frequencies</span>(keys<span class="opt">)</span>
+  <span class="kwb">&#64;frequencies</span> = {}
+  threads = []
+
+  key_lengths = keys.<span class="kwd">map</span>(&amp;<span class="kwc">:size</span><span class="opt">)</span>.uniq
+  key_lengths.each <span class="kwa">do</span> |key_length|
+    threads &lt;&lt; Thread.new <span class="kwa">do</span>
+      results_hash = <span class="kwd">key_frequency</span>(key_length, <span class="kwb">&#64;seq</span><span class="opt">)</span>
+      <span class="kwb">&#64;frequencies</span>.merge!(results_hash<span class="opt">)</span>
+    <span class="kwa">end</span>
+  <span class="kwa">end</span>
+  threads.<span class="kwd">each</span>(&amp;<span class="kwc">:join</span><span class="opt">)</span>
+  <span class="kwb">&#64;frequencies</span>
+<span class="kwa">end</span>
+
+<span class="kwa">def</span> <span class="kwd">forking_key_frequency</span>(key_length, seq<span class="opt">)</span>
+  reader, writer = IO.pipe
+
+  pid = Process.fork <span class="kwa">do</span>
+    <span class="kwa">begin</span>
+      reader.close
+      results = <span class="kwd">original_key_frequency</span>(key_length, seq<span class="opt">)</span>
+      Marshal.<span class="kwd">dump</span>(results, writer<span class="opt">)</span>
+    <span class="kwa">ensure</span>
+      writer.close
+    <span class="kwa">end</span>
+  <span class="kwa">end</span>
+
+  writer.close
+  <span class="kwa">begin</span>
+    results = Marshal.<span class="kwd">load</span>(reader<span class="opt">)</span>
+  <span class="kwa">ensure</span>
+    reader.close
+  <span class="kwa">end</span>
+  Process.<span class="kwd">waitpid</span>(pid<span class="opt">)</span>
+
+  results
+<span class="kwa">end</span>
+
+<span class="kwa">def</span> <span class="kwd">key_frequency</span>(key_length, seq<span class="opt">)</span>
+  count = Hash.<span class="kwd">new</span>(<span class="num">0</span><span class="opt">)</span>
+  start_index = <span class="num">0</span>
+  last_length = seq.size - key_length
+  <span class="kwa">while</span> start_index &lt; last_length
+    key = seq.<span class="kwd">byteslice</span>(start_index, key_length<span class="opt">)</span>
+    count[key] += <span class="num">1</span>
+    start_index += <span class="num">1</span>
+  <span class="kwa">end</span>
+  count
+<span class="kwa">end</span>
+
+<span class="kwa">def</span> <span class="kwd">frequency</span>(keys<span class="opt">)</span>
+  keys.map <span class="kwa">do</span> |key|
+    [key, <span class="kwb">&#64;frequencies</span>[key]]
+  <span class="kwa">end</span>
+<span class="kwa">end</span>
+
+<span class="kwa">def</span> <span class="kwd">percentage</span>(keys<span class="opt">)</span>
+  <span class="kwd">frequency</span>(keys<span class="opt">)</span>.sort { |a,b| b[1] &lt;=&gt; a[1] }.map <span class="kwa">do</span> |key, value|
+    <span class="str">&quot;%s %.3f&quot;</span> % [ key.upcase, ( (value*<span class="num">100</span><span class="opt">)</span>.to_f / <span class="kwb">&#64;seq</span>.size<span class="opt">)</span> ]
+  <span class="kwa">end</span>
+<span class="kwa">end</span>
+
+<span class="kwa">def</span> <span class="kwd">count</span>(keys<span class="opt">)</span>
+  <span class="kwd">frequency</span>(keys<span class="opt">)</span>.sort_by { |a| a[0].size }.map <span class="kwa">do</span> |key, value|
+    <span class="str">&quot;</span><span class="ipl">#{value.to_s}</span><span class="str"></span><span class="esc">\t</span><span class="str"></span><span class="ipl">#{key.upcase}</span><span class="str">&quot;</span>
+  <span class="kwa">end</span>
+<span class="kwa">end</span>
+
+<span class="kwa">def</span> <span class="kwd">load_sequence</span>(marker<span class="opt">)</span>
+  input = <span class="kwc">STDIN</span>.read
+  start_idx = input.<span class="kwd">index</span>(marker<span class="opt">)</span> + marker.size
+  <span class="kwb">&#64;seq</span> = input[start_idx, input.size - <span class="num">1</span>]
+  <span class="kwb">&#64;seq</span>.delete!(<span class="str">&quot;</span><span class="esc">\n</span> <span class="str">&quot;</span><span class="opt">)</span>
+  <span class="kwb">&#64;seq</span>.freeze
+  <span class="kwb">&#64;seq</span>
+<span class="kwa">end</span>
+
+singles = %<span class="kwd">w</span>(a t c g<span class="opt">)</span>
+doubles = %<span class="kwd">w</span>(aa at ac ag ta tt tc tg ca ct cc cg ga gt gc gg<span class="opt">)</span>
+chains  = %<span class="kwd">w</span>(ggt ggta ggtatt ggtattttaatt ggtattttaatttatagt<span class="opt">)</span>
+
+<span class="kwd">load_sequence</span>(<span class="str">&apos;&gt;THREE Homo sapiens frequency&apos;</span><span class="opt">)</span>
+<span class="kwd">find_frequencies</span>(singles + doubles + chains<span class="opt">)</span>
+
+print <span class="str">&quot;</span><span class="ipl">#{percentage(singles).join(&quot;\n&quot;)}</span><span class="str"></span><span class="esc">\n\n</span><span class="str">&quot;</span>
+print <span class="str">&quot;</span><span class="ipl">#{percentage(doubles).join(&quot;\n&quot;)}</span><span class="str"></span><span class="esc">\n\n</span><span class="str">&quot;</span>
+print <span class="str">&quot;</span><span class="ipl">#{count(chains).join(&quot;\n&quot;)}</span><span class="str"></span><span class="esc">\n</span><span class="str">&quot;</span>
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+ruby 3.1.0p0
+(2021-12-25
+revision fb4df44d16)
+[x86_64-linux] --yjit
+
+
+Fri, 07 Jan 2022 19:32:41 GMT
+
+COMMAND LINE:
+/opt/src/ruby-3.1.0/bin/ruby --yjit -W0 knucleotide.ruby-7.ruby 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

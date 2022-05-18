@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide PHP&nbsp;#4 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide PHP&nbsp;#4 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+&lt;?
+<span class="com">/* </span>
+<span class="com">   The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">   contributed by Damien Bonvillain</span>
+<span class="com">   fixed by Isaac Gouy</span>
+<span class="com">   improved by Levi Cameron</span>
+<span class="com">*/</span>
+
+$sequence = <span class="kwd">read_sequence</span>(<span class="str">&apos;THREE&apos;</span>);
+
+<span class="kwd">fclose</span>(STDIN);
+
+$jobs = <span class="kwa">array</span>(
+   <span class="kwa">array</span>(<span class="str">&apos;write_freq&apos;</span>, <span class="num">1</span>),
+   <span class="kwa">array</span>(<span class="str">&apos;write_freq&apos;</span>, <span class="num">2</span>),
+   <span class="kwa">array</span>(<span class="str">&apos;write_count&apos;</span>, <span class="str">&apos;GGT&apos;</span>),
+   <span class="kwa">array</span>(<span class="str">&apos;write_count&apos;</span>, <span class="str">&apos;GGTA&apos;</span>),
+   <span class="kwa">array</span>(<span class="str">&apos;write_count&apos;</span>, <span class="str">&apos;GGTATT&apos;</span>),
+   <span class="kwa">array</span>(<span class="str">&apos;write_count&apos;</span>, <span class="str">&apos;GGTATTTTAATT&apos;</span>),
+   <span class="kwa">array</span>(<span class="str">&apos;write_count&apos;</span>, <span class="str">&apos;GGTATTTTAATTTATAGT&apos;</span>),
+);
+
+$tok = <span class="kwd">ftok</span>(__FILE__, <span class="kwd">chr</span>(<span class="kwd">time</span>() &amp; <span class="num">255</span>));
+$queue = <span class="kwd">msg_get_queue</span>($tok);
+
+$parent = TRUE;
+$count = <span class="kwd">count</span>($jobs);
+<span class="kwa">for</span> ($i = <span class="num">1</span>; $i &lt; $count; ++$i) {
+   $pid = <span class="kwd">pcntl_fork</span>();
+   <span class="kwa">if</span> ($pid === -<span class="num">1</span>) {
+      <span class="kwa">die</span>(<span class="str">&apos;could not fork&apos;</span>);
+   } <span class="kwa">else if</span> ($pid) {
+      <span class="kwa">continue</span>;
+   }
+   $parent = FALSE;
+   <span class="kwa">break</span>;
+}
+<span class="kwa">if</span> ($parent) {
+   $i = <span class="num">0</span>;
+}
+
+$func = $jobs[$i][<span class="num">0</span>];
+$arg =  $jobs[$i][<span class="num">1</span>];
+
+<span class="kwd">ob_start</span>();
+
+$func($sequence, $arg);
+
+$result = <span class="kwa">array</span>($i, <span class="kwd">ob_get_clean</span>());
+
+<span class="kwa">if</span> (!<span class="kwd">msg_send</span>($queue, <span class="num">2</span>, $result, TRUE, FALSE, $errno)) {
+   <span class="kwd">var_dump</span>(<span class="str">&quot;</span><span class="ipl">$errno</span><span class="str">&quot;</span>);
+   <span class="kwd">var_dump</span>(<span class="kwd">msg_stat_queue</span>($queue));
+}
+
+<span class="kwa">if</span> (!$parent) {
+   <span class="kwa">exit</span>(<span class="num">0</span>);
+}
+
+$results = <span class="kwa">array</span>();
+<span class="kwa">foreach</span>($jobs <span class="kwa">as</span> $job) {
+    <span class="kwd">msg_receive</span>($queue, <span class="num">2</span>, $msgtype, <span class="num">4096</span>, $result, TRUE);
+   $results[$result[<span class="num">0</span>]] = $result[<span class="num">1</span>];
+   <span class="kwd">pcntl_wait</span>($s);
+}
+
+<span class="kwd">ksort</span>($results);
+<span class="kwa">foreach</span> ($results <span class="kwa">as</span> $result) {
+   <span class="kwa">echo</span> $result;
+}
+
+<span class="kwd">msg_remove_queue</span>($queue);
+
+
+<span class="com">/* functions definitions follow */</span>
+<span class="kwa">function</span> <span class="kwd">read_sequence</span>($id) {
+   $id = <span class="str">&apos;&gt;&apos;</span> . $id;
+   $ln_id = <span class="kwd">strlen</span>($id);
+   $fd = STDIN;
+
+   <span class="slc">// reach sequence three</span>
+   <span class="kwa">do</span> {
+      $line = <span class="kwd">stream_get_line</span>($fd, <span class="num">250</span>, <span class="str">&quot;</span><span class="esc">\n</span><span class="str">&quot;</span>);
+	  <span class="slc">// if EOF then we couldn&apos;t find the sequence</span>
+	  <span class="kwa">if</span> (<span class="kwd">feof</span>($fd)) <span class="kwa">exit</span>(-<span class="num">1</span>);
+   } <span class="kwa">while</span> (<span class="kwd">strncmp</span>($line, $id, $ln_id) !== <span class="num">0</span>);
+
+   <span class="kwd">ob_start</span>();	<span class="slc">// for repeated string concatenations, output buffering is fastest</span>
+   <span class="slc">// next, read the content of the sequence</span>
+   <span class="kwa">while</span> (!<span class="kwd">feof</span>($fd)) {
+      $line = <span class="kwd">stream_get_line</span>($fd, <span class="num">250</span>, <span class="str">&quot;</span><span class="esc">\n</span><span class="str">&quot;</span>);
+      <span class="kwa">if</span> (!<span class="kwa">isset</span>($line[<span class="num">0</span>])) <span class="kwa">continue</span>;
+      $c = $line[<span class="num">0</span>];
+      <span class="kwa">if</span> ($c === <span class="str">&apos;;&apos;</span>) <span class="kwa">continue</span>;
+      <span class="kwa">if</span> ($c === <span class="str">&apos;&gt;&apos;</span>) <span class="kwa">break</span>;
+      <span class="slc">// append the uppercase sequence fragment,</span>
+      <span class="slc">// must get rid of the CR/LF or whatever if present</span>
+      <span class="kwa">echo</span> $line;
+   }
+   <span class="kwa">return</span> <span class="kwd">strtoupper</span>(<span class="kwd">ob_get_clean</span>());
+}
+
+<span class="kwa">function</span> <span class="kwd">write_freq</span>($sequence, $key_length) {
+   $map = <span class="kwd">generate_frequencies</span>($sequence, $key_length);
+   <span class="kwd">uasort</span>($map, <span class="str">&apos;freq_name_comparator&apos;</span>);
+   <span class="kwa">foreach</span>($map <span class="kwa">as</span> $key =&gt; $val) {
+      <span class="kwd">printf</span> (<span class="str">&quot;</span><span class="ipl">%s</span> <span class="str">%.3f</span><span class="esc">\n</span><span class="str">&quot;</span>, $key, $val);
+   }
+   <span class="kwa">echo</span> <span class="str">&quot;</span><span class="esc">\n</span><span class="str">&quot;</span>;
+}
+
+<span class="kwa">function</span> <span class="kwd">write_count</span>($sequence, $key) {
+   $map = <span class="kwd">generate_frequencies</span>($sequence, <span class="kwd">strlen</span>($key), false);
+   <span class="kwa">if</span> (<span class="kwa">isset</span>($map[$key])) $value = $map[$key];
+   <span class="kwa">else</span> $value = <span class="num">0</span>;
+   <span class="kwd">printf</span> (<span class="str">&quot;</span><span class="ipl">%d</span><span class="str"></span><span class="esc">\t</span><span class="str"></span><span class="ipl">%s</span><span class="str"></span><span class="esc">\n</span><span class="str">&quot;</span>, $value, $key);
+}
+
+<span class="com">/**</span>
+<span class="com"> * Returns a map (key, count or freq(default))</span>
+<span class="com"> */</span>
+<span class="kwa">function</span> <span class="kwd">generate_frequencies</span>($sequence, $key_length, $compute_freq = true) {
+   $result = <span class="kwa">array</span>();
+   $total = <span class="kwd">strlen</span>($sequence) - $key_length;
+   $i = $total;
+   <span class="kwa">if</span> ($key_length === <span class="num">1</span>) { 
+      <span class="kwa">do</span> {
+         $x = &amp;$result[$sequence[$i--]];
+         $x++;
+      } <span class="kwa">while</span> ($i);
+   } <span class="kwa">else</span> {
+      <span class="kwa">do</span> {
+         $x = &amp;$result[<span class="kwd">substr</span>($sequence, $i--, $key_length)];
+         $x++;
+      } <span class="kwa">while</span> ($i);
+   }
+   <span class="kwa">if</span>($compute_freq) {
+      <span class="kwa">foreach</span>($result <span class="kwa">as</span> $k =&gt; $v) {
+         $result[$k] = $v * <span class="num">100</span> / $total;
+      }
+   }
+   <span class="kwa">return</span> $result;
+}
+
+<span class="kwa">function</span> <span class="kwd">freq_name_comparator</span>($a, $b) {
+   <span class="kwa">if</span> ($a == $b) <span class="kwa">return</span> <span class="num">0</span>;
+   <span class="kwa">return</span>  ($a &lt; $b) ? <span class="num">1</span> : -<span class="num">1</span>;
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+PHP 8.1.1 (cli)
+(built: Jan  6 2022 19:24:43) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.1.1,
+Copyright (c) Zend Technologies
+
+
+Sun, 16 Jan 2022 01:38:22 GMT
+
+COMMAND LINE:
+/opt/src/php-8.1.1/bin/php -dzend_extension=/opt/src/php-8.1.1/lib/php/extensions/no-debug-non-zts-20210902/opcache.so -dopcache.enable_cli=1 -dopcache.jit_buffer_size=64M -n -d memory_limit=1024M knucleotide.php-4.php 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

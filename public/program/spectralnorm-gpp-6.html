@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>spectral-norm C++ g++&nbsp;#6 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>spectral-norm C++ g++&nbsp;#6 program</h1>
+    <aside>
+      <p><a href="../description/spectralnorm.html#spectralnorm">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">// The Computer Language Benchmarks Game</span>
+<span class="slc">// https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">//</span>
+<span class="slc">// Original C contributed by Sebastien Loisel</span>
+<span class="slc">// Conversion to C++ by Jon Harrop</span>
+<span class="slc">// OpenMP parallelize by The Anh Tran</span>
+<span class="slc">// Add SSE by The Anh Tran</span>
+<span class="slc">// Additional SSE optimization by Krzysztof Jakubowski</span>
+
+<span class="slc">// g++ -pipe -O3 -march=native -fopenmp -mfpmath=sse -msse2 \</span>
+<span class="slc">//     ./spec.c++ -o ./spec.run</span>
+
+<span class="ppc">#include &lt;cmath&gt;</span>
+<span class="ppc">#include &lt;cstdlib&gt;</span>
+<span class="ppc">#include &lt;cstdio&gt;</span>
+<span class="ppc">#include &lt;sched.h&gt;</span>
+<span class="ppc">#include &lt;omp.h&gt;</span>
+<span class="ppc">#include &lt;emmintrin.h&gt;</span>
+
+<span class="kwc">template</span> &lt;<span class="kwb">bool</span> modei&gt; <span class="kwb">int</span> <span class="kwd">Index</span>(<span class="kwb">int</span> i, <span class="kwb">int</span> j) {
+    <span class="kwa">return</span> (((i + j) * (i + j + <span class="num">1</span>)) &gt;&gt; <span class="num">1</span>) + (modei? i : j) + <span class="num">1</span>;
+}
+
+<span class="kwc">template</span> &lt;<span class="kwb">bool</span> modei&gt;
+<span class="kwb">void</span> <span class="kwd">EvalPart</span>(<span class="kwb">double</span> *__restrict__ src, <span class="kwb">double</span> *__restrict__ dst,
+                <span class="kwb">int</span> begin, <span class="kwb">int</span> end, <span class="kwb">int</span> length) {
+    <span class="kwb">int</span> i = begin;
+
+    <span class="kwa">for</span>(; i + <span class="num">1</span> &lt; end; i += <span class="num">2</span>) {
+        __m128d sum = <span class="kwd">_mm_set_pd</span>(
+			src[<span class="num">0</span>] / <span class="kwb">double</span>(Index&lt;modei&gt;(i + <span class="num">1</span>, <span class="num">0</span>)),
+			src[<span class="num">0</span>] / <span class="kwb">double</span>(Index&lt;modei&gt;(i + <span class="num">0</span>, <span class="num">0</span>)));
+    
+		__m128d ti = modei?
+			<span class="kwd">_mm_set_pd</span>(i + <span class="num">1</span>, i + <span class="num">0</span>) :
+			<span class="kwd">_mm_set_pd</span>(i + <span class="num">2</span>, i + <span class="num">1</span>);	
+		__m128d last = <span class="kwd">_mm_set_pd</span>(
+			Index&lt;modei&gt;(i + <span class="num">1</span>, <span class="num">0</span>),
+			Index&lt;modei&gt;(i + <span class="num">0</span>, <span class="num">0</span>));
+
+        <span class="kwa">for</span>(<span class="kwb">int</span> j = <span class="num">1</span>; j &lt; length; j++) {
+			__m128d idx = last + ti + <span class="kwd">_mm_set1_pd</span>(j);
+			last = idx;
+            sum = sum + <span class="kwd">_mm_set1_pd</span>(src[j]) / idx;
+        }
+
+        <span class="kwd">_mm_storeu_pd</span>(dst + i + <span class="num">0</span>, sum);
+    }
+    <span class="kwa">for</span>(; i &lt; end; i++) {
+        <span class="kwb">double</span> sum = <span class="num">0</span>;
+        <span class="kwa">for</span> (<span class="kwb">int</span> j = <span class="num">0</span>; j &lt; length; j++)
+            sum += src[j] / <span class="kwb">double</span>(Index&lt;modei&gt;(i, j));
+        dst[i] = sum;
+    }
+
+}
+
+<span class="kwb">void</span> <span class="kwd">EvalATimesU</span>(<span class="kwb">double</span> *src, <span class="kwb">double</span> *dst, <span class="kwb">int</span> begin, <span class="kwb">int</span> end, <span class="kwb">int</span> N) {
+    EvalPart&lt;<span class="num">1</span>&gt;(src, dst, begin, end, N);
+}
+
+<span class="kwb">void</span> <span class="kwd">EvalAtTimesU</span>(<span class="kwb">double</span> *src, <span class="kwb">double</span> *dst, <span class="kwb">int</span> begin, <span class="kwb">int</span> end, <span class="kwb">int</span> N) {
+    EvalPart&lt;<span class="num">0</span>&gt;(src, dst, begin, end, N);
+}
+
+<span class="kwb">void</span> <span class="kwd">EvalAtATimesU</span>(<span class="kwb">double</span> *src, <span class="kwb">double</span> *dst, <span class="kwb">double</span> *tmp,
+                   <span class="kwb">int</span> begin, <span class="kwb">int</span> end, <span class="kwb">int</span> N) {
+    <span class="kwd">EvalATimesU</span> (src, tmp, begin, end, N);
+    <span class="ppc">#pragma omp barrier</span>
+    <span class="kwd">EvalAtTimesU</span>(tmp, dst, begin, end, N);
+    <span class="ppc">#pragma omp barrier</span>
+}
+
+<span class="kwb">int</span> <span class="kwd">GetThreadCount</span>() {
+    cpu_set_t cs;
+    <span class="kwd">CPU_ZERO</span>(&amp;cs);
+    <span class="kwd">sched_getaffinity</span>(<span class="num">0</span>, <span class="kwa">sizeof</span>(cs), &amp;cs);
+
+    <span class="kwb">int</span> count = <span class="num">0</span>;
+    <span class="kwa">for</span> (<span class="kwb">int</span> i = <span class="num">0</span>; i &lt; CPU_SETSIZE; ++i)
+        <span class="kwa">if</span> (<span class="kwd">CPU_ISSET</span>(i, &amp;cs))
+            ++count;
+
+    <span class="kwa">return</span> count;
+}
+
+<span class="kwb">double</span> <span class="kwd">spectral_game</span>(<span class="kwb">int</span> N) {
+    <span class="kwd">__attribute__</span>((<span class="kwd">aligned</span>(<span class="num">16</span>))) <span class="kwb">double</span> u[N];
+    <span class="kwd">__attribute__</span>((<span class="kwd">aligned</span>(<span class="num">16</span>))) <span class="kwb">double</span> v[N], tmp[N];
+
+    <span class="kwb">double</span> vBv = <span class="num">0.0</span>;
+    <span class="kwb">double</span> vv = <span class="num">0.0</span>;
+
+    <span class="ppc">#pragma omp parallel default(shared) num_threads(GetThreadCount())</span>
+    {
+        <span class="slc">// this block will be executed by NUM_THREADS</span>
+        <span class="slc">// variable declared in this block is private for each thread</span>
+        <span class="kwb">int</span> threadid = <span class="kwd">omp_get_thread_num</span>();
+        <span class="kwb">int</span> threadcount = <span class="kwd">omp_get_num_threads</span>();
+        <span class="kwb">int</span> chunk = N / threadcount;
+
+        <span class="slc">// calculate each thread&apos;s working range [r1 .. r2) =&gt; static schedule</span>
+        <span class="kwb">int</span> begin = threadid * chunk;
+        <span class="kwb">int</span> end = (threadid &lt; (threadcount -<span class="num">1</span>)) ? (begin + chunk) : N;
+
+        <span class="kwa">for</span>(<span class="kwb">int</span> i = begin; i &lt; end; i++)
+            u[i] = <span class="num">1.0</span>;
+        <span class="ppc">#pragma omp barrier</span>
+
+        <span class="kwa">for</span> (<span class="kwb">int</span> ite = <span class="num">0</span>; ite &lt; <span class="num">10</span>; ++ite) {
+            <span class="kwd">EvalAtATimesU</span>(u, v, tmp, begin, end, N);
+            <span class="kwd">EvalAtATimesU</span>(v, u, tmp, begin, end, N);
+        }
+    
+        <span class="kwb">double</span> sumvb = <span class="num">0.0</span>, sumvv = <span class="num">0.0</span>;
+        <span class="kwa">for</span> (<span class="kwb">int</span> i = begin; i &lt; end; i++) {
+            sumvv += v[i] * v[i];
+            sumvb += u[i] * v[i];
+        }
+
+        <span class="ppc">#pragma omp critical</span>
+        {
+            vBv += sumvb;
+            vv += sumvv;
+        }
+    }
+
+    <span class="kwa">return</span> <span class="kwd">sqrt</span>(vBv / vv);
+}
+
+<span class="kwb">int</span> <span class="kwd">main</span>(<span class="kwb">int</span> argc, <span class="kwb">char</span> *argv[]) {
+    <span class="kwb">int</span> N = ((argc &gt;= <span class="num">2</span>) ? <span class="kwd">atoi</span>(argv[<span class="num">1</span>]) : <span class="num">2000</span>);
+    <span class="kwd">printf</span>(<span class="str">&quot;%.9f</span><span class="esc">\n</span><span class="str">&quot;</span>, <span class="kwd">spectral_game</span>(N));
+    <span class="kwa">return</span> <span class="num">0</span>;
+}
+
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 23:08:35 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -fopenmp spectralnorm.gpp-6.c++ -o spectralnorm.gpp-6.c++.o &amp;&amp;  \
+        /usr/bin/g++ spectralnorm.gpp-6.c++.o -o spectralnorm.gpp-6.gpp_run -fopenmp 
+rm spectralnorm.gpp-6.c++
+
+2.47s to complete and log all make actions
+
+COMMAND LINE:
+./spectralnorm.gpp-6.gpp_run 5500
+
+PROGRAM OUTPUT:
+1.274224153
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

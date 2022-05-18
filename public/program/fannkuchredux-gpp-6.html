@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>fannkuch-redux C++ g++&nbsp;#6 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>fannkuch-redux C++ g++&nbsp;#6 program</h1>
+    <aside>
+      <p><a href="../description/fannkuchredux.html#fannkuchredux">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">// The Computer Language Benchmarks Game</span>
+<span class="slc">// https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">//</span>
+<span class="slc">// Contributed by Andrei Simion (with patch from Vincent Yu)</span>
+<span class="slc">// Based on &quot;fannkuch-redux C++ g++ #5&quot;, contributed by Dave Compton,</span>
+<span class="slc">// which in turn was based on the C program by Jeremy Zerfasm</span>
+<span class="slc">// which in turn was based on the Ada program by Jonathan Parker and </span>
+<span class="slc">// Georg Bauhaus which in turn was based on code by Dave Fladebo, </span>
+<span class="slc">// Eckehard Berns, Heiner Marxen, Hongwei Xi, and The Anh Tran and </span>
+<span class="slc">// also the Java program by Oleg Mazurov.</span>
+
+<span class="ppc">#include &lt;array&gt;</span>
+<span class="ppc">#include &lt;iostream&gt;</span>
+<span class="ppc">#include &lt;algorithm&gt;</span>
+<span class="ppc">#include &lt;immintrin.h&gt;</span>
+
+<span class="kwa">using</span> small_int_t = <span class="kwb">char</span>;
+<span class="kwa">using</span> big_int_t   = <span class="kwb">int64_t</span>;
+
+<span class="kwc">constexpr</span> small_int_t max_n = <span class="num">16</span>;
+<span class="kwc">constexpr</span> <span class="kwb">int</span> max_blocks = <span class="num">24</span>;
+
+<span class="kwb">struct</span> Masks
+{
+    __m128i masks_reverse[<span class="num">16</span>];
+    __m128i masks_shift[<span class="num">16</span>];
+   
+    <span class="kwd">Masks</span>()
+    {
+        <span class="slc">// first elements are never accessed</span>
+        masks_reverse[<span class="num">1</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">0</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">2</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">3</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">4</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">5</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">6</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">7</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">8</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">9</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">9</span>, <span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">10</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">10</span>, <span class="num">9</span>, <span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">11</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">11</span>, <span class="num">10</span>, <span class="num">9</span>, <span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">12</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">12</span>, <span class="num">11</span>, <span class="num">10</span>, <span class="num">9</span>, <span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">13</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">13</span>, <span class="num">12</span>, <span class="num">11</span>, <span class="num">10</span>, <span class="num">9</span>, <span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">14</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">14</span>, <span class="num">13</span>, <span class="num">12</span>, <span class="num">11</span>, <span class="num">10</span>, <span class="num">9</span>, <span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">15</span>);
+        masks_reverse[<span class="num">15</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">15</span>, <span class="num">14</span>, <span class="num">13</span>, <span class="num">12</span>, <span class="num">11</span>, <span class="num">10</span>, <span class="num">9</span>, <span class="num">8</span>, <span class="num">7</span>, <span class="num">6</span>, <span class="num">5</span>, <span class="num">4</span>, <span class="num">3</span>, <span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>);
+
+        masks_shift[<span class="num">1</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">0</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">2</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">0</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">3</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">0</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">4</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">0</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">5</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">0</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">6</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">0</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">7</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">0</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">8</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">0</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">9</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">0</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">10</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">0</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">11</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">0</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">12</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">0</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">13</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">0</span>, <span class="num">14</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">14</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">0</span>, <span class="num">15</span>);
+        masks_shift[<span class="num">15</span>] = <span class="kwd">_mm_setr_epi8</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>, <span class="num">0</span>);
+    }
+};
+
+std::array&lt;big_int_t, max_n&gt; <span class="kwd">compute_factorials</span>(small_int_t n)
+{
+    std::array&lt;big_int_t, max_n&gt; factorials;
+
+    factorials[<span class="num">0</span>] = <span class="num">1</span>;
+    <span class="kwa">for</span> (small_int_t i = <span class="num">1</span>; i &lt;= n; ++i)
+        factorials[i] = factorials[i-<span class="num">1</span>] * i;
+
+    <span class="kwa">return</span> factorials;
+} 
+
+std::array&lt;<span class="kwb">int</span>, <span class="num">2</span>&gt; <span class="kwd">get_blocks_and_size</span>(small_int_t n, 
+                                       std::array&lt;big_int_t, max_n&gt;&amp; factorials)
+{
+    <span class="kwb">int</span> blocks = max_blocks;
+    <span class="kwa">if</span> (blocks &gt; factorials[n])
+        blocks = <span class="num">1</span>;
+    <span class="kwb">int</span> block_size = factorials[n] / blocks;
+    
+    <span class="kwa">return</span> {blocks, block_size};
+}
+
+std::array&lt;big_int_t, max_n&gt; <span class="kwd">create_count</span>(small_int_t n, big_int_t start,
+                                          std::array&lt;big_int_t, max_n&gt;&amp; factorials)
+{
+    std::array&lt;big_int_t, max_n&gt; count;
+   
+    <span class="kwa">for</span> (small_int_t i = n - <span class="num">1</span>; i &gt;= <span class="num">0</span>; --i) 
+    {
+        big_int_t d = start / factorials[i];
+        start = start % factorials[i];
+        count[i] = d;
+    }
+
+    <span class="kwa">return</span> count;
+}
+
+__m128i <span class="kwd">create_current</span>(small_int_t n, 
+                              std::array&lt;big_int_t, max_n&gt;&amp; count)
+{
+    <span class="slc">// not a &quot;hotspot&quot;, using intrinsics for rotations don&apos;t bring</span>
+    <span class="slc">// much benefit here considering the increased complexity</span>
+    <span class="kwd">alignas</span>(<span class="num">16</span>) std::array&lt;small_int_t, max_n&gt; current_aux = 
+	{<span class="num">0</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>, <span class="num">7</span>, <span class="num">8</span>, <span class="num">9</span>, <span class="num">10</span>, <span class="num">11</span>, <span class="num">12</span>, <span class="num">13</span>, <span class="num">14</span>, <span class="num">15</span>};  
+    
+    <span class="kwa">for</span> (small_int_t i = n - <span class="num">1</span>; i &gt;= <span class="num">0</span>; --i) 
+    {
+        std::<span class="kwd">rotate</span>(current_aux.<span class="kwd">begin</span>(), 
+                    current_aux.<span class="kwd">begin</span>() + count[i],
+                    current_aux.<span class="kwd">begin</span>() + i + <span class="num">1</span>);
+    }
+    __m128i current = <span class="kwd">_mm_load_si128</span>((__m128i*)current_aux.<span class="kwd">data</span>());
+    <span class="kwa">return</span> current;
+}
+
+<span class="kwc">inline</span> __m128i <span class="kwd">increment_permutation</span>(std::array&lt;big_int_t, max_n&gt;&amp; count,
+			          __m128i current, <span class="kwb">const</span> Masks&amp; masks)
+{
+    <span class="kwa">for</span> (small_int_t i = <span class="num">1</span>; ; ++i) 
+    {
+        current = <span class="kwd">_mm_shuffle_epi8</span>(current, masks.masks_shift[i]);  
+        <span class="kwa">if</span> (++count[i] &lt;= i)
+            <span class="kwa">break</span>;
+        count[i] = <span class="num">0</span>;
+    }
+    <span class="kwa">return</span> current;
+}
+
+<span class="kwc">inline</span> __m128i <span class="kwd">reverse</span>(__m128i x, small_int_t idx, <span class="kwb">const</span> Masks&amp; masks)
+{
+    <span class="kwa">return</span> <span class="kwd">_mm_shuffle_epi8</span>(x, masks.masks_reverse[idx]);
+}
+
+
+<span class="kwb">int</span> <span class="kwd">main</span>(<span class="kwb">int</span> argc, <span class="kwb">char</span> **argv)
+{   
+    <span class="kwb">int</span> n = <span class="kwd">atoi</span>(argv[<span class="num">1</span>]);
+    <span class="kwc">auto</span> factorials = <span class="kwd">compute_factorials</span>(n);
+    <span class="kwc">auto</span> [blocks, block_size] = <span class="kwd">get_blocks_and_size</span>(n, factorials);
+
+    small_int_t max_flips = <span class="num">0</span>;
+    big_int_t checksum  = <span class="num">0</span>;
+
+    <span class="slc">// iterate over each block.</span>
+    <span class="ppc">#pragma omp parallel for \</span>
+<span class="ppc">        reduction(max:max_flips) \</span>
+<span class="ppc">        reduction(+:checksum)</span>
+    <span class="kwa">for</span> (big_int_t block_start = <span class="num">0</span>; 
+            block_start &lt; factorials[n];
+            block_start += block_size) 
+    {
+        Masks masks;
+        
+        std::array&lt;big_int_t, max_n&gt; count = <span class="kwd">create_count</span>(n, block_start, factorials);      
+
+        __m128i current = <span class="kwd">create_current</span>(n, count);
+        __m128i current_start = current;	
+
+        small_int_t first = <span class="kwd">_mm_extract_epi8</span>(current, <span class="num">0</span>);
+
+        <span class="slc">// iterate over each permutation in the block.</span>
+        big_int_t crt_idx = block_start;
+        big_int_t block_end = block_start + block_size;
+	
+        <span class="kwa">while</span> (crt_idx &lt; block_end) 
+        { 
+            <span class="kwa">if</span> (first &gt; <span class="num">0</span>)
+            {   
+                small_int_t flips = <span class="num">0</span>;
+                <span class="kwa">while</span> (first != <span class="num">0</span>) 
+                {
+                    <span class="slc">// patch from Vincent Yu</span>
+                    <span class="kwc">auto</span> next = <span class="kwa">reinterpret_cast</span>&lt;<span class="kwb">char</span>(&amp;)[<span class="num">16</span>]&gt;(current)[first];
+                    current = <span class="kwd">reverse</span>(current, first, masks);
+                    first = next;
+                    ++flips;
+                } 
+                
+                checksum += (crt_idx % <span class="num">2</span>) == <span class="num">0</span> ? flips : -flips;
+
+                <span class="kwa">if</span> (flips &gt; max_flips)
+                    max_flips = flips;
+            }
+
+            current = <span class="kwd">increment_permutation</span>(count, current_start, masks);
+            current_start = current;
+            
+            first = <span class="kwd">_mm_extract_epi8</span>(current, <span class="num">0</span>);
+            ++crt_idx;
+        }
+    }
+    std::cout &lt;&lt; checksum &lt;&lt; <span class="str">&quot;</span><span class="esc">\n</span><span class="str">Pfannkuchen(&quot;</span> &lt;&lt; n &lt;&lt; <span class="str">&quot;) = &quot;</span> &lt;&lt; (<span class="kwb">int</span>)max_flips &lt;&lt; <span class="str">&quot;</span><span class="esc">\n</span><span class="str">&quot;</span>;
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+11.2.0-7ubuntu2
+
+
+Thu, 24 Feb 2022 20:58:13 GMT
+
+MAKE:
+/usr/bin/g++ -c -pipe -O3 -fomit-frame-pointer -march=ivybridge  -std=c++17 -fopenmp fannkuchredux.gpp-6.c++ -o fannkuchredux.gpp-6.c++.o &amp;&amp;  \
+        /usr/bin/g++ fannkuchredux.gpp-6.c++.o -o fannkuchredux.gpp-6.gpp_run -fopenmp 
+rm fannkuchredux.gpp-6.c++
+
+3.61s to complete and log all make actions
+
+COMMAND LINE:
+./fannkuchredux.gpp-6.gpp_run 12
+
+PROGRAM OUTPUT:
+3968050
+Pfannkuchen(12) = 65
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

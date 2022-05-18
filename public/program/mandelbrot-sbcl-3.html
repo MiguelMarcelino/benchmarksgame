@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>mandelbrot Lisp SBCL&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>mandelbrot Lisp SBCL&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/mandelbrot.html#mandelbrot">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">;;   The Computer Language Benchmarks Game</span>
+<span class="slc">;;   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">;;;</span>
+<span class="slc">;;; resubmitted by Wade Humeniuk (Fix Stream Problem)</span>
+<span class="slc">;;; resubmitted by Jon Smith (Remove silly assertion causing it to break on 16000 size)</span>
+<span class="slc">;;; re-resubmitted by Jon Smith (with a silly hack to make it parallel).</span>
+<span class="slc">;;; Original contributed by Yannick Gingras</span>
+<span class="slc">;;;</span>
+<span class="slc">;;; To compile</span>
+<span class="slc">;;; sbcl --load mandelbrot.lisp --eval &quot;(save-lisp-and-die \&quot;mandelbrot.core\&quot; :purify t :toplevel (lambda () (main) (quit)))&quot;</span>
+<span class="slc">;;; To run</span>
+<span class="slc">;;; sbcl --noinform --core mandelbrot.core %A</span>
+
+(<span class="kwa">defun</span> render (<span class="kwa">size</span> stream)
+  (<span class="kwa">declare</span> (<span class="kwa">type</span> fixnum size) (<span class="kwa">stream</span> stream)
+	   (<span class="kwa">optimize</span> (<span class="kwa">speed</span> <span class="num">3</span>) (<span class="kwa">safety</span> <span class="num">0</span>) (<span class="kwa">debug</span> <span class="num">0</span>)))
+  (<span class="kwa">let</span>* ((<span class="kwa">code</span> <span class="num">0</span>) 
+	 (<span class="kwa">bit</span> <span class="num">0</span>)
+         (<span class="kwa">zr</span> <span class="num">0.0</span>d0)
+	 (<span class="kwa">zi</span> <span class="num">0.0</span>d0)
+	 (<span class="kwa">tr</span> <span class="num">0.0</span>d0)
+	 (<span class="kwa">delta</span> (/ <span class="num">2</span>d0 size))
+         (<span class="kwa">base-real</span> -<span class="num">1.5</span>d0) 
+	 (<span class="kwa">base-imag</span> -<span class="num">1.0</span>d0)
+         (<span class="kwa">buffer</span> (<span class="kwa">make-array</span> (* size (<span class="kwa">ceiling</span> size <span class="num">8</span>)) :element-type &apos;(<span class="kwa">unsigned-byte</span> <span class="num">8</span>)))
+         (<span class="kwa">index</span> <span class="num">0</span>))
+
+    (<span class="kwa">declare</span> (<span class="kwa">type</span> (<span class="kwa">unsigned-byte</span> <span class="num">8</span>) code )
+             (<span class="kwa">type</span> double-float zr zi tr base-real base-imag delta)
+             (<span class="kwa">type</span> fixnum index bit))
+
+    (<span class="kwa">dotimes</span> (<span class="kwa">y</span> size)
+      (<span class="kwa">setf</span> base-imag (<span class="kwa">-</span> <span class="num">1.0</span>d0 (* delta y)))
+      (<span class="kwa">dotimes</span> (<span class="kwa">x</span> size)
+	(<span class="kwa">setf</span> base-real (+ -<span class="num">1.5</span>d0 (* delta x))
+	      zr base-real
+	      zi base-imag)
+        (<span class="kwa">setf</span> code  
+	      (<span class="kwa">if</span> (<span class="kwa">dotimes</span> (<span class="kwa">n</span> <span class="num">50</span>)
+		    (<span class="kwa">when</span> (&lt; <span class="num">4.0</span>d0 (+ (* zr zr) (* zi zi)))
+		      (<span class="kwa">return</span> t))
+		    (<span class="kwa">setf</span> tr (+ (* zr zr) (<span class="kwa">-</span> (* zi zi)) base-real)
+			  zi (+ (* <span class="num">2.0</span>d0 zr zi) base-imag)
+			  zr tr))
+		  (<span class="kwa">ash</span> code <span class="num">1</span>)
+		  (<span class="kwa">logior</span> (<span class="kwa">ash</span> code <span class="num">1</span>) #x01)))
+	(<span class="kwa">when</span> (= (<span class="kwa">incf</span> bit) <span class="num">8</span>)
+	  (<span class="kwa">setf</span> (<span class="kwa">aref</span> buffer index) code
+		bit <span class="num">0</span> code <span class="num">0</span>)
+	  (<span class="kwa">incf</span> index))))
+
+    (<span class="kwa">write-sequence</span> buffer stream)))
+
+(<span class="kwa">defun</span> par-render (<span class="kwa">size</span> stream)
+  (<span class="kwa">declare</span> (<span class="kwa">type</span> fixnum size)		(<span class="kwa">stream</span> stream)
+	   (<span class="kwa">optimize</span> (<span class="kwa">speed</span> <span class="num">3</span>) (<span class="kwa">safety</span> <span class="num">0</span>) (<span class="kwa">debug</span> <span class="num">0</span>)))
+
+  (<span class="kwa">let</span>* ((<span class="kwa">buffer</span> (<span class="kwa">make-array</span> (* size (<span class="kwa">ceiling</span> size <span class="num">8</span>)) :element-type &apos;(<span class="kwa">unsigned-byte</span> <span class="num">8</span>)))
+	 (<span class="kwa">quarter-size</span> (<span class="kwa">ceiling</span> size <span class="num">4</span>))
+	 (<span class="kwa">quarter-array</span> (<span class="kwa">ceiling</span> (<span class="kwa">the</span> (<span class="kwa">unsigned-byte</span> <span class="num">32</span>) (* size size)) <span class="num">32</span>)))
+    
+
+    (<span class="kwa">labels</span> ((<span class="kwa">render-sub</span> (<span class="kwa">y-start</span> y-end index)
+	       (<span class="kwa">let</span> ((<span class="kwa">code</span> <span class="num">0</span>) 
+		     (<span class="kwa">bit</span> <span class="num">0</span>)
+		     (<span class="kwa">zr</span> <span class="num">0.0</span>d0) (<span class="kwa">zi</span> <span class="num">0.0</span>d0) (<span class="kwa">tr</span> <span class="num">0.0</span>d0)
+		     (<span class="kwa">delta</span> (/ <span class="num">2</span>d0 size))
+		     (<span class="kwa">base-real</span> -<span class="num">1.5</span>d0)  (<span class="kwa">base-imag</span> -<span class="num">1.0</span>d0))
+		 (<span class="kwa">declare</span> (<span class="kwa">type</span> (<span class="kwa">unsigned-byte</span> <span class="num">8</span>) code)
+			  (<span class="kwa">type</span> double-float zr zi tr base-real base-imag delta)
+			  (<span class="kwa">type</span> fixnum index bit))
+
+
+		 (<span class="kwa">do</span> ((<span class="kwa">y</span> y-start (<span class="kwa">1</span>+ y)))
+		     ((= y y-end))
+		   (<span class="kwa">declare</span> (<span class="kwa">type</span> (<span class="kwa">unsigned-byte</span> <span class="num">32</span>) y))
+
+		   (<span class="kwa">setf</span> base-imag (<span class="kwa">-</span> <span class="num">1.0</span>d0 (* delta y)))
+		   (<span class="kwa">dotimes</span> (<span class="kwa">x</span> size)
+		     (<span class="kwa">setf</span> base-real (+ -<span class="num">1.5</span>d0 (* delta x))
+			   zr base-real
+			   zi base-imag)
+		     (<span class="kwa">setf</span> code  
+			   (<span class="kwa">if</span> (<span class="kwa">dotimes</span> (<span class="kwa">n</span> <span class="num">50</span>)
+				 (<span class="kwa">when</span> (&lt; <span class="num">4.0</span>d0 (+ (* zr zr) (* zi zi)))
+				   (<span class="kwa">return</span> t))
+				 (<span class="kwa">setf</span> tr (+ (* zr zr) (<span class="kwa">-</span> (* zi zi)) base-real)
+				       zi (+ (* <span class="num">2.0</span>d0 zr zi) base-imag)
+				       zr tr))
+			       (<span class="kwa">ash</span> code <span class="num">1</span>)
+			       (<span class="kwa">logior</span> (<span class="kwa">ash</span> code <span class="num">1</span>) #x01)))
+		     (<span class="kwa">when</span> (= (<span class="kwa">incf</span> bit) <span class="num">8</span>)
+		       (<span class="kwa">setf</span> (<span class="kwa">aref</span> buffer index) code
+			     bit <span class="num">0</span> 
+			     code <span class="num">0</span>)
+		       (<span class="kwa">incf</span> index))
+		     )))))
+      (<span class="kwa">let</span> (<span class="kwa">threads</span>)
+	(<span class="kwa">dotimes</span> (<span class="kwa">i</span> <span class="num">4</span>)
+	  (<span class="kwa">let</span> ((<span class="kwa">start</span> (* i quarter-size))
+		(<span class="kwa">end</span> (* (+ i <span class="num">1</span>) quarter-size))
+		(<span class="kwa">idx</span> (* i quarter-array)))
+	    (<span class="kwa">push</span> (<span class="kwa">sb-thread</span>:make-thread (<span class="kwa">lambda</span> () (<span class="kwa">render-sub</span> start end idx))) threads)))
+	(<span class="kwa">dolist</span> (<span class="kwa">thread</span> threads)
+	  (<span class="kwa">sb-thread</span>:join-thread thread)))
+      (<span class="kwa">write-sequence</span> buffer stream))))
+
+(<span class="kwa">defun</span> main ()
+  (<span class="kwa">declare</span> (<span class="kwa">optimize</span> (<span class="kwa">speed</span> <span class="num">0</span>) (<span class="kwa">safety</span> <span class="num">3</span>)))
+  (<span class="kwa">let</span>* ((<span class="kwa">args</span> sb-ext:*posix-argv*)
+	 (<span class="kwa">n</span> (<span class="kwa">parse-integer</span> (<span class="kwa">second</span> args))))
+    (<span class="kwa">with-open-stream</span> (<span class="kwa">stream</span> (<span class="kwa">sb-sys</span>:make-fd-stream (<span class="kwa">sb-sys</span>:fd-stream-fd sb-sys:*stdout*)
+						     :element-type :default
+						     :buffering :full
+						     :output t :input nil))
+
+      (<span class="kwa">format</span> stream <span class="str">&quot;P4~%~d ~d~%&quot;</span> n n)
+      #+sb-thread(<span class="kwa">par-render</span> n stream)
+      #-sb-thread(<span class="kwa">render</span> n stream)
+      (<span class="kwa">force-output</span> stream))))
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+SBCL 2.2.0
+
+
+Wed, 12 Jan 2022 03:29:05 GMT
+
+MAKE:
+cp: 'mandelbrot.sbcl-3.sbcl' and './mandelbrot.sbcl-3.sbcl' are the same file
+SBCL built with: /opt/src/sbcl-2.2.0/bin/sbcl --userinit /dev/null --batch --eval '(load &quot;mandelbrot.sbcl-3.sbcl_compile&quot;)'
+### START mandelbrot.sbcl-3.sbcl_compile
+(handler-bind ((sb-ext:defconstant-uneql      (lambda (c) (abort c))))      (require :sb-concurrency)      (load (compile-file &quot;mandelbrot.sbcl-3.sbcl&quot; ))) (save-lisp-and-die &quot;sbcl.core&quot; :purify t)
+### END mandelbrot.sbcl-3.sbcl_compile
+
+; compiling file &quot;/home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/mandelbrot.sbcl-3.sbcl&quot; (written 26 APR 2018 12:48:32 PM):
+
+; wrote /home/dunham/all-benchmarksgame/benchmarksgame_i53330/mandelbrot/tmp/mandelbrot.sbcl-3.fasl
+; compilation finished in 0:00:00.036
+### START mandelbrot.sbcl-3.sbcl_run
+(main) (quit)
+### END mandelbrot.sbcl-3.sbcl_run
+
+
+2.52s to complete and log all make actions
+
+COMMAND LINE:
+/opt/src/sbcl-2.2.0/bin/sbcl  --noinform --core sbcl.core --userinit /dev/null --load mandelbrot.sbcl-3.sbcl_run 16000
+
+(BINARY) PROGRAM OUTPUT NOT SHOWN
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

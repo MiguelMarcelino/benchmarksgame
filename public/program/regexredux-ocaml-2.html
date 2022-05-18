@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>regex-redux OCaml&nbsp;#2 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>regex-redux OCaml&nbsp;#2 program</h1>
+    <aside>
+      <p><a href="../description/regexredux.html#regexredux">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">(* The Computer Language Benchmarks Game</span>
+<span class="com"> * https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"> *</span>
+<span class="com"> * regex-dna program contributed by Christophe TROESTLER</span>
+<span class="com"> * converted from regex-dna program</span>
+<span class="com"> *</span>
+<span class="com"> * updated by Roman Kashitsyn: use Bytes instead of String</span>
+<span class="com"> *)</span>
+
+<span class="kwa">open</span> <span class="kwd">Printf</span>
+
+<span class="kwa">let</span> variants = [<span class="str">&quot;agggtaaa</span><span class="esc">\\</span><span class="str">|tttaccct&quot;</span>;          <span class="str">&quot;[cgt]gggtaaa</span><span class="esc">\\</span><span class="str">|tttaccc[acg]&quot;</span>;
+                <span class="str">&quot;a[act]ggtaaa</span><span class="esc">\\</span><span class="str">|tttacc[agt]t&quot;</span>;  <span class="str">&quot;ag[act]gtaaa</span><span class="esc">\\</span><span class="str">|tttac[agt]ct&quot;</span>;
+                <span class="str">&quot;agg[act]taaa</span><span class="esc">\\</span><span class="str">|ttta[agt]cct&quot;</span>;  <span class="str">&quot;aggg[acg]aaa</span><span class="esc">\\</span><span class="str">|ttt[cgt]ccct&quot;</span>;
+                <span class="str">&quot;agggt[cgt]aa</span><span class="esc">\\</span><span class="str">|tt[acg]accct&quot;</span>;  <span class="str">&quot;agggta[cgt]a</span><span class="esc">\\</span><span class="str">|t[acg]taccct&quot;</span>;
+                <span class="str">&quot;agggtaa[cgt]</span><span class="esc">\\</span><span class="str">|[acg]ttaccct&quot;</span>]
+
+<span class="com">(* Remove the &quot;\\&quot; which is mandatory in OCaml regex. *)</span>
+<span class="kwa">let</span> re_bs = <span class="kwc">Str</span>.regexp_string <span class="str">&quot;</span><span class="esc">\\</span><span class="str">&quot;</span>
+<span class="kwa">let</span> to_string = <span class="kwc">Str</span>.global_replace re_bs <span class="str">&quot;&quot;</span>
+
+<span class="kwa">let</span> subst = [<span class="str">&quot;tHa[Nt]&quot;</span>, <span class="str">&quot;&lt;4&gt;&quot;</span>; <span class="str">&quot;aND</span><span class="esc">\\</span><span class="str">|caN</span><span class="esc">\\</span><span class="str">|Ha[DS]</span><span class="esc">\\</span><span class="str">|WaS&quot;</span>, <span class="str">&quot;&lt;3&gt;&quot;</span>;
+             <span class="str">&quot;a[NSt]</span><span class="esc">\\</span><span class="str">|BY&quot;</span>, <span class="str">&quot;&lt;2&gt;&quot;</span>; <span class="str">&quot;&lt;[^&gt;]*&gt;&quot;</span>, <span class="str">&quot;|&quot;</span>; <span class="str">&quot;|[^|][^|]*|&quot;</span>, <span class="str">&quot;-&quot;</span>] 
+
+<span class="com">(* Read all of a redirected FASTA format file from stdin. *)</span>
+<span class="kwa">let</span> file_data, file_length =
+  <span class="kwa">let</span> b = <span class="kwc">Buffer</span>.create <span class="num">0xFFFF</span> <span class="kwa">in</span>
+  <span class="kwa">let</span> s = <span class="kwc">Bytes</span>.create <span class="num">0xFFF</span> <span class="kwa">in</span>
+  <span class="kwa">let</span> r = <span class="kwb">ref</span> <span class="num">1</span> <span class="kwa">in</span>
+  <span class="kwa">while</span> !r &gt; <span class="num">0</span> <span class="kwa">do</span>
+    r := input stdin s <span class="num">0 0xFFF</span>;
+    <span class="kwc">Buffer</span>.add_substring b (<span class="kwc">Bytes</span>.unsafe_to_string s) <span class="num">0</span> !r
+  <span class="kwa">done</span>;
+  (<span class="kwc">Buffer</span>.contents b, <span class="kwc">Buffer</span>.length b)
+
+<span class="com">(* Remove FASTA sequence descriptions and all linefeed characters.  *)</span>
+<span class="kwa">let</span> dna = <span class="kwc">Str</span>.global_replace (<span class="kwc">Str</span>.regexp <span class="str">&quot;^&gt;.*$</span><span class="esc">\\</span><span class="str">|</span><span class="esc">\n</span><span class="str">&quot;</span>) <span class="str">&quot;&quot;</span> file_data
+<span class="kwa">let</span> code_length = <span class="kwc">String</span>.length dna
+
+<span class="com">(* Count matches of [re]. *)</span>
+<span class="kwa">let</span> count re s =
+  <span class="kwa">let</span> re = <span class="kwc">Str</span>.regexp_case_fold re <span class="kwa">in</span>
+  <span class="kwa">let</span> i = <span class="kwb">ref</span> <span class="num">0</span> <span class="kwa">in</span>
+  <span class="kwa">let</span> n = <span class="kwb">ref</span> <span class="num">0</span> <span class="kwa">in</span>
+  <span class="kwa">try</span>
+    <span class="kwa">while true do</span>
+      i := <span class="num">1</span> + <span class="kwc">Str</span>.search_forward re s !i;
+      incr n
+    <span class="kwa">done</span>;
+    <span class="kwa">assert false</span>
+  <span class="kwa">with</span> <span class="kwd">Not_found</span> -&gt; !n
+
+
+<span class="kwa">let</span> () =
+  <span class="kwc">List</span>.iter (<span class="kwa">fun</span> re -&gt; printf <span class="str">&quot;</span><span class="ipl">%s %i</span><span class="str"></span><span class="esc">\n</span><span class="str">&quot;</span> (to_string re) (count re dna)) variants;
+  <span class="kwa">let</span> b = <span class="kwb">ref</span> dna <span class="kwa">in</span>
+  <span class="kwc">List</span>.iter (<span class="kwa">fun</span> (re, s) -&gt;
+               b := <span class="kwc">Str</span>.global_replace (<span class="kwc">Str</span>.regexp re) s !b) subst;
+  printf <span class="str">&quot;</span><span class="esc">\n</span><span class="str"></span><span class="ipl">%i</span><span class="str"></span><span class="esc">\n</span><span class="str"></span><span class="ipl">%i</span><span class="str"></span><span class="esc">\n</span><span class="str"></span><span class="ipl">%i</span><span class="str"></span><span class="esc">\n</span><span class="str">&quot;</span> file_length code_length (<span class="kwc">String</span>.length !b)
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+OCaml native-code
+version 4.13.1
+
+
+Tue, 11 Jan 2022 21:10:38 GMT
+
+MAKE:
+mv regexredux.ocaml-2.ocaml regexredux.ocaml-2.ml
+~/.opam/4.13.1/bin/ocamlopt -noassert -unsafe -fPIC -nodynlink -inline 100 -O3 unix.cmxa str.cmxa -ccopt -march=ivybridge regexredux.ocaml-2.ml -o regexredux.ocaml-2.ocaml_run
+rm regexredux.ocaml-2.ml
+
+1.36s to complete and log all make actions
+
+COMMAND LINE:
+./regexredux.ocaml-2.ocaml_run 0 &lt; regexredux-input5000000.txt
+
+PROGRAM OUTPUT:
+agggtaaa|tttaccct 356
+[cgt]gggtaaa|tttaccc[acg] 1250
+a[act]ggtaaa|tttacc[agt]t 4252
+ag[act]gtaaa|tttac[agt]ct 2894
+agg[act]taaa|ttta[agt]cct 5435
+aggg[acg]aaa|ttt[cgt]ccct 1537
+agggt[cgt]aa|tt[acg]accct 1431
+agggta[cgt]a|t[acg]taccct 1608
+agggtaa[cgt]|[acg]ttaccct 2178
+
+50833411
+50000000
+27388361
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

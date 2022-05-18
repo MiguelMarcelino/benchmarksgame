@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>spectral-norm PHP&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>spectral-norm PHP&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/spectralnorm.html#spectralnorm">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+&lt;? 
+<span class="com">/* </span>
+<span class="com">   The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com">   contributed by Isaac Gouy</span>
+<span class="com">   multicore by anon</span>
+<span class="com"> */</span>
+
+
+<span class="kwa">function</span> <span class="kwd">A</span>(&amp;$i, &amp;$j){
+   <span class="kwa">return</span> <span class="num">1.0</span> / ( ( ( ($i+$j) * ($i+$j+<span class="num">1</span>) ) &gt;&gt; <span class="num">1</span> ) + $i + <span class="num">1</span> );
+}
+
+<span class="kwa">function</span> <span class="kwd">Av</span>(&amp;$n,&amp;$v,&amp;$start,&amp;$end){
+   <span class="kwa">global</span> $_tpl;
+   $Av = $_tpl;
+   <span class="kwa">for</span> ($i = $start; $i &lt; $end; ++$i) {
+      $sum = <span class="num">0.0</span>;
+      <span class="kwa">foreach</span>($v <span class="kwa">as</span> $j=&gt;$v_j) {
+         $sum += <span class="kwd">A</span>($i,$j) * $v_j;
+      }
+      $Av[$i] = $sum;
+   }
+   <span class="kwa">return</span> $Av;
+}
+
+<span class="kwa">function</span> <span class="kwd">Atv</span>(&amp;$n,&amp;$v,&amp;$start,&amp;$end){
+   <span class="kwa">global</span> $_tpl;
+   $Atv = $_tpl;
+   <span class="kwa">for</span>($i = $start; $i &lt; $end; ++$i) {
+      $sum = <span class="num">0.0</span>;
+      <span class="kwa">foreach</span>($v <span class="kwa">as</span> $j=&gt;$v_j) {
+         $sum += <span class="kwd">A</span>($j,$i) * $v_j;
+      }
+      $Atv[$i] = $sum;
+   }
+   <span class="kwa">return</span> $Atv;
+}
+
+<span class="kwa">function</span> <span class="kwd">AtAv</span>(&amp;$n,&amp;$v,&amp;$start,&amp;$end,&amp;$sync){
+
+   $tmp = <span class="kwd">Av</span>($n, $v, $start, $end);
+   <span class="kwa">if</span> ($sync) <span class="kwd">sync</span>($tmp);
+
+   $tmp = <span class="kwd">Atv</span>($n, $tmp, $start, $end);
+   <span class="kwa">if</span> ($sync) <span class="kwd">sync</span>($tmp);
+
+   <span class="kwa">return</span> $tmp;
+}
+
+<span class="kwa">function</span> <span class="kwd">sync</span>(&amp;$tmp) {
+
+   <span class="kwa">global</span> $parent,$chunk_data_size,$total_data_size,$pipe,$pipes;
+
+   <span class="kwa">if</span> (!$parent) {
+      <span class="kwd">array_unshift</span>($tmp, <span class="str">&apos;d*&apos;</span>);
+      $data = <span class="kwd">call_user_func_array</span>(<span class="str">&apos;pack&apos;</span>, $tmp);
+      <span class="kwd">safe_write</span>($pipe, $data);
+      $tmp = <span class="kwd">array_merge</span>(<span class="kwa">array</span>(), <span class="kwd">unpack</span>(<span class="str">&apos;d*&apos;</span>, <span class="kwd">safe_read</span>($pipe, $total_data_size)));
+   } <span class="kwa">else</span> {
+      $tmps = <span class="kwa">array</span>(<span class="kwa">array</span>(<span class="str">&apos;d*&apos;</span>));
+      <span class="kwa">foreach</span>($pipes <span class="kwa">as</span> $pipe) {
+         $tmps[] = <span class="kwd">unpack</span>(<span class="str">&apos;d*&apos;</span>, <span class="kwd">safe_read</span>($pipe, $chunk_data_size));
+      }
+      $tmps[] = &amp;$tmp;
+      $tmp = <span class="kwd">call_user_func_array</span>(<span class="str">&apos;array_merge&apos;</span>, $tmps);
+
+      $data = <span class="kwd">call_user_func_array</span>(<span class="str">&apos;pack&apos;</span>, $tmp);
+      <span class="kwa">foreach</span>($pipes <span class="kwa">as</span> $pipe) {
+         <span class="kwd">safe_write</span>($pipe, $data);
+      }
+      <span class="kwd">array_shift</span>($tmp);
+   }
+}
+
+<span class="kwa">function</span> <span class="kwd">safe_write</span>($fd, $data) {
+   $len = <span class="kwd">strlen</span>($data);
+   <span class="kwa">do</span> {
+      $w = <span class="kwd">fwrite</span>($fd, $data);
+      $len -= $w;
+   } <span class="kwa">while</span>($len &amp;&amp; ($data = <span class="kwd">substr</span>($data, $w)) !== FALSE);
+}
+<span class="kwa">function</span> <span class="kwd">safe_read</span>($fd, $len) {
+   $data = <span class="str">&apos;&apos;</span>;
+   <span class="kwa">while</span> ($len &gt; <span class="num">0</span>) {
+      $d = <span class="kwd">fread</span>($fd, $len);
+      $len -= <span class="kwd">strlen</span>($d);
+      $data .= $d;
+   }
+   <span class="kwa">return</span> $data;
+}
+<span class="kwa">function</span> <span class="kwd">pipe</span>() {
+   <span class="kwa">return</span> <span class="kwd">stream_socket_pair</span>(STREAM_PF_UNIX, STREAM_SOCK_STREAM, <span class="num">0</span>);
+}
+
+
+$n = (<span class="kwb">int</span>) (($argc == <span class="num">2</span>) ? $argv[<span class="num">1</span>] : <span class="num">1</span>);
+
+$procs = <span class="num">1</span>;
+<span class="kwa">if</span> (<span class="kwd">file_exists</span>(<span class="str">&apos;/proc/cpuinfo&apos;</span>)) {
+   $procs = <span class="kwd">preg_match_all</span>(<span class="str">&apos;/^processor\s/m&apos;</span>, <span class="kwd">file_get_contents</span>(<span class="str">&apos;/proc/cpuinfo&apos;</span>), $discard);
+}
+
+<span class="kwa">if</span> ($n &lt; $procs) {
+   $procs = <span class="num">1</span>;
+}
+
+$chunk_size = (<span class="kwb">int</span>) ($n / $procs);
+$double_size = <span class="kwd">strlen</span>(<span class="kwd">pack</span>(<span class="str">&apos;d&apos;</span>, <span class="num">0.0</span>));
+$chunk_data_size = $double_size * $chunk_size;
+$total_data_size = $double_size * $n;
+
+$pipes = <span class="kwa">array</span>();
+$parent = FALSE;
+<span class="kwa">for</span>($i = <span class="num">0</span>; $i &lt; $procs; ++$i) {
+   $range_begin = $i * $chunk_size;
+   <span class="kwa">if</span> ($i &lt; ($procs - <span class="num">1</span>)) {
+      $pipe = <span class="kwd">pipe</span>();
+      $pipes[] = $pipe[<span class="num">0</span>];
+      $pipe = $pipe[<span class="num">1</span>];
+      $range_end = $range_begin + $chunk_size;
+      $pid = <span class="kwd">pcntl_fork</span>();
+      <span class="kwa">if</span> ($pid === -<span class="num">1</span>) {
+         <span class="kwa">die</span>(<span class="str">&apos;could not fork&apos;</span>);
+      } <span class="kwa">else if</span> ($pid) {
+         <span class="kwa">continue</span>;
+      }
+      <span class="kwa">break</span>;
+   } <span class="kwa">else</span> {
+      $range_end = $n;
+      $parent = TRUE;
+   }
+}
+
+$u = <span class="kwd">array_fill</span>(<span class="num">0</span>, $n, <span class="num">1.0</span>);
+$_tpl = <span class="kwd">array_fill</span>($range_begin, $range_end - $range_begin, <span class="num">0.0</span>);
+$sync = $procs &gt; <span class="num">0</span>;
+
+<span class="kwa">for</span> ($i=<span class="num">0</span>; $i&lt;<span class="num">10</span>; $i++){
+   $v = <span class="kwd">AtAv</span>($n,$u,$range_begin,$range_end,$sync);
+   $u = <span class="kwd">AtAv</span>($n,$v,$range_begin,$range_end,$sync);
+}
+
+<span class="kwa">if</span> (!$parent) {
+   <span class="kwa">exit</span>(<span class="num">0</span>);
+}
+
+$childs = $procs - <span class="num">1</span>;
+<span class="kwa">while</span> ($childs--) {
+   <span class="kwd">pcntl_wait</span>($s);
+}
+
+$vBv = <span class="num">0.0</span>;
+$vv = <span class="num">0.0</span>;
+$i = <span class="num">0</span>;
+<span class="kwa">foreach</span>($v <span class="kwa">as</span> $val) {
+   $vBv += $u[$i]*$val;
+   $vv += $val*$val;
+   ++$i;
+}
+<span class="kwd">printf</span>(<span class="str">&quot;</span><span class="ipl">%0</span><span class="str">.9f</span><span class="esc">\n</span><span class="str">&quot;</span>, <span class="kwd">sqrt</span>($vBv/$vv));
+
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+PHP 8.1.1 (cli)
+(built: Jan  6 2022 19:24:43) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.1.1,
+Copyright (c) Zend Technologies
+
+
+Sun, 16 Jan 2022 02:11:12 GMT
+
+COMMAND LINE:
+/opt/src/php-8.1.1/bin/php -dzend_extension=/opt/src/php-8.1.1/lib/php/extensions/no-debug-non-zts-20210902/opcache.so -dopcache.enable_cli=1 -dopcache.jit_buffer_size=64M -n  spectralnorm.php-3.php 5500
+
+PROGRAM OUTPUT:
+1.274224153
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

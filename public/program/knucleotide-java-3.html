@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide Java&nbsp;#3 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide Java&nbsp;#3 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com"> https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"></span>
+<span class="com"> contributed by James McIlree</span>
+<span class="com"> ByteString code thanks to Matthieu Bentot and The Anh Tran</span>
+<span class="com"> modified by Andy Fingerhut </span>
+<span class="com"> */</span>
+
+<span class="kwa">import</span> java.util.*;
+<span class="kwa">import</span> java.io.*;
+<span class="kwa">import</span> java.util.concurrent.*;
+
+<span class="kwa">public class</span> knucleotide {
+    <span class="kwa">static</span> ArrayList&lt;Callable&lt; Map&lt;ByteString, ByteString&gt; &gt; &gt; <span class="kwd">createFragmentTasks</span>(<span class="kwa">final</span> <span class="kwb">byte</span>[] sequence, <span class="kwb">int</span>[] fragmentLengths) {
+	ArrayList&lt;Callable&lt;Map&lt;ByteString, ByteString&gt;&gt;&gt; tasks = <span class="kwa">new</span> ArrayList&lt;Callable&lt;Map&lt;ByteString, ByteString&gt;&gt;&gt;();
+	<span class="kwa">for</span> (<span class="kwb">int</span> fragmentLength : fragmentLengths) {
+	    <span class="kwa">for</span> (<span class="kwb">int</span> index=<span class="num">0</span>; index&lt;fragmentLength; index++) {
+		<span class="kwa">final</span> <span class="kwb">int</span> offset = index;
+		<span class="kwa">final</span> <span class="kwb">int</span> finalFragmentLength = fragmentLength;
+		tasks.<span class="kwd">add</span>(<span class="kwa">new</span> Callable&lt;Map&lt;ByteString, ByteString&gt;&gt;() {
+		    <span class="kwa">public</span> Map&lt;ByteString, ByteString&gt; <span class="kwd">call</span>() {
+			<span class="kwa">return</span> <span class="kwd">createFragmentMap</span>(sequence, offset, finalFragmentLength);
+		    }
+		});
+	    }
+	}
+	<span class="kwa">return</span> tasks;
+    }
+
+    <span class="kwa">static</span> Map&lt;ByteString, ByteString&gt; <span class="kwd">createFragmentMap</span>(<span class="kwb">byte</span>[] sequence, <span class="kwb">int</span> offset, <span class="kwb">int</span> fragmentLength) {
+	HashMap&lt;ByteString, ByteString&gt; map = <span class="kwa">new</span> HashMap&lt;ByteString, ByteString&gt;();
+	<span class="kwb">int</span> lastIndex = sequence.length - fragmentLength + <span class="num">1</span>;
+	ByteString key = <span class="kwa">new</span> <span class="kwd">ByteString</span>(fragmentLength);
+	<span class="kwa">for</span> (<span class="kwb">int</span> index=offset; index&lt;lastIndex; index+=fragmentLength) {
+	    key.<span class="kwd">calculateHash</span>(sequence, index);
+	    ByteString fragment = map.<span class="kwd">get</span>(key);
+	    <span class="kwa">if</span> (fragment != null) {
+		fragment.count++;
+	    } <span class="kwa">else</span> {
+		map.<span class="kwd">put</span>(key, key);
+		key = <span class="kwa">new</span> <span class="kwd">ByteString</span>(fragmentLength);
+	    }
+	}
+
+	<span class="kwa">return</span> map;
+    }
+
+    <span class="slc">// Destructive!</span>
+    <span class="kwa">static</span> Map&lt;ByteString, ByteString&gt; <span class="kwd">sumTwoMaps</span>(Map&lt;ByteString, ByteString&gt; map1, Map&lt;ByteString, ByteString&gt; map2) {
+	<span class="kwa">for</span> (Map.Entry&lt;ByteString, ByteString&gt; entry : map2.<span class="kwd">entrySet</span>()) {
+	    ByteString sum = map1.<span class="kwd">get</span>(entry.<span class="kwd">getKey</span>());
+	    <span class="kwa">if</span> (sum != null)
+		sum.count += entry.<span class="kwd">getValue</span>().count;
+	    <span class="kwa">else</span>
+		map1.<span class="kwd">put</span>(entry.<span class="kwd">getKey</span>(), entry.<span class="kwd">getValue</span>());
+	}
+	<span class="kwa">return</span> map1;
+    }
+
+    <span class="kwa">static</span> String <span class="kwd">writeFrequencies</span>(<span class="kwb">float</span> totalCount, Map&lt;ByteString, ByteString&gt; frequencies) {
+	SortedSet&lt;ByteString&gt; list = <span class="kwa">new</span> TreeSet&lt;ByteString&gt;(frequencies.<span class="kwd">values</span>());
+	StringBuilder sb = <span class="kwa">new</span> <span class="kwd">StringBuilder</span>();
+	<span class="kwa">for</span> (ByteString k : list)
+	    sb.<span class="kwd">append</span>(String.<span class="kwd">format</span>(<span class="str">&quot;%s %.3f</span><span class="esc">\n</span><span class="str">&quot;</span>, k.<span class="kwd">toString</span>().<span class="kwd">toUpperCase</span>(), (<span class="kwb">float</span>)(k.count) * <span class="num">100.0</span>f / totalCount));
+
+	<span class="kwa">return</span> sb.<span class="kwd">append</span>(<span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>).<span class="kwd">toString</span>();
+    }
+
+    <span class="kwa">static</span> String <span class="kwd">writeCount</span>(List&lt;Future&lt;Map&lt;ByteString, ByteString&gt;&gt;&gt; futures, String nucleotideFragment) <span class="kwa">throws</span> Exception {
+	ByteString key = <span class="kwa">new</span> <span class="kwd">ByteString</span>(nucleotideFragment.<span class="kwd">length</span>());
+	key.<span class="kwd">calculateHash</span>(nucleotideFragment.<span class="kwd">getBytes</span>(), <span class="num">0</span>);
+
+	<span class="kwb">int</span> count = <span class="num">0</span>;
+	<span class="kwa">for</span> (Future&lt;Map&lt;ByteString, ByteString&gt;&gt; future : futures) {
+	    ByteString temp = future.<span class="kwd">get</span>().<span class="kwd">get</span>(key);
+	    <span class="kwa">if</span> (temp != null) count += temp.count;
+	}
+
+	<span class="kwa">return</span> count + <span class="str">&quot;</span><span class="esc">\t</span><span class="str">&quot;</span> + nucleotideFragment.<span class="kwd">toUpperCase</span>() + <span class="str">&apos;</span><span class="esc">\n</span><span class="str">&apos;</span>;
+    }
+
+    <span class="kwa">public static</span> <span class="kwb">void</span> <span class="kwd">main</span> (String[] args) <span class="kwa">throws</span> Exception {
+	String line;
+	BufferedReader <span class="kwa">in</span> = <span class="kwa">new</span> <span class="kwd">BufferedReader</span>(<span class="kwa">new</span> <span class="kwd">InputStreamReader</span>(System.<span class="kwa">in</span>));
+	<span class="kwa">while</span> ((line = <span class="kwa">in</span>.<span class="kwd">readLine</span>()) != null) {
+	    <span class="kwa">if</span> (line.<span class="kwd">startsWith</span>(<span class="str">&quot;&gt;THREE&quot;</span>)) <span class="kwa">break</span>;
+	}
+
+	ByteArrayOutputStream baos = <span class="kwa">new</span> <span class="kwd">ByteArrayOutputStream</span>();
+        <span class="kwb">byte</span> bytes[] = <span class="kwa">new</span> <span class="kwb">byte</span>[<span class="num">100</span>];
+        <span class="kwa">while</span>((line = <span class="kwa">in</span>.<span class="kwd">readLine</span>()) != null) {
+	    <span class="kwa">if</span> (line.<span class="kwd">length</span>() &gt; bytes.length)
+		bytes = <span class="kwa">new</span> <span class="kwb">byte</span>[line.<span class="kwd">length</span>()];
+
+	    <span class="kwb">int</span> i;
+	    <span class="kwa">for</span>(i=<span class="num">0</span>; i&lt;line.<span class="kwd">length</span>(); i++)
+		bytes[i] = (<span class="kwb">byte</span>)line.<span class="kwd">charAt</span>(i);
+	    baos.<span class="kwd">write</span>(bytes, <span class="num">0</span>, i);
+        }
+
+	<span class="kwb">byte</span>[] sequence = baos.<span class="kwd">toByteArray</span>();
+
+	ExecutorService pool = Executors.<span class="kwd">newFixedThreadPool</span>(Runtime.<span class="kwd">getRuntime</span>().<span class="kwd">availableProcessors</span>());
+	<span class="kwb">int</span>[] fragmentLengths = { <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">6</span>, <span class="num">12</span>, <span class="num">18</span> };
+	List&lt;Future&lt;Map&lt;ByteString, ByteString&gt;&gt;&gt; futures = pool.<span class="kwd">invokeAll</span>(<span class="kwd">createFragmentTasks</span>(sequence, fragmentLengths));
+	pool.<span class="kwd">shutdown</span>();
+
+	StringBuilder sb = <span class="kwa">new</span> <span class="kwd">StringBuilder</span>();
+
+	sb.<span class="kwd">append</span>(<span class="kwd">writeFrequencies</span>(sequence.length, futures.<span class="kwd">get</span>(<span class="num">0</span>).<span class="kwd">get</span>()));
+	sb.<span class="kwd">append</span>(<span class="kwd">writeFrequencies</span>(sequence.length - <span class="num">1</span>, <span class="kwd">sumTwoMaps</span>(futures.<span class="kwd">get</span>(<span class="num">1</span>).<span class="kwd">get</span>(), futures.<span class="kwd">get</span>(<span class="num">2</span>).<span class="kwd">get</span>())));
+
+	String[] nucleotideFragments = { <span class="str">&quot;ggt&quot;</span>, <span class="str">&quot;ggta&quot;</span>, <span class="str">&quot;ggtatt&quot;</span>, <span class="str">&quot;ggtattttaatt&quot;</span>, <span class="str">&quot;ggtattttaatttatagt&quot;</span> };
+	<span class="kwa">for</span> (String nucleotideFragment : nucleotideFragments) {
+	    sb.<span class="kwd">append</span>(<span class="kwd">writeCount</span>(futures, nucleotideFragment));
+	}
+
+	System.out.<span class="kwd">print</span>(sb.<span class="kwd">toString</span>());
+    }
+
+    <span class="kwa">static final class</span> ByteString <span class="kwa">implements</span> Comparable&lt;ByteString&gt; {
+        <span class="kwa">public</span> <span class="kwb">int</span> hash, count=<span class="num">1</span>;
+        <span class="kwa">public final</span> <span class="kwb">byte</span> bytes[];
+
+        <span class="kwa">public</span> <span class="kwd">ByteString</span>(<span class="kwb">int</span> size) {
+            bytes = <span class="kwa">new</span> <span class="kwb">byte</span>[size];
+        }
+
+        <span class="kwa">public</span> <span class="kwb">void</span> <span class="kwd">calculateHash</span>(<span class="kwb">byte</span> k[], <span class="kwb">int</span> offset) {
+	    <span class="kwb">int</span> temp = <span class="num">0</span>;
+            <span class="kwa">for</span> (<span class="kwb">int</span> i=<span class="num">0</span>; i&lt;bytes.length; i++) {
+		<span class="kwb">byte</span> b = k[offset+i];
+                bytes[i] = b;
+                temp = temp * <span class="num">31</span> + b;
+            }
+	    hash = temp;
+        }
+
+        <span class="kwa">public</span> <span class="kwb">int</span> <span class="kwd">hashCode</span>() {
+            <span class="kwa">return</span> hash;
+        }
+
+        <span class="kwa">public</span> <span class="kwb">boolean</span> <span class="kwd">equals</span>(Object obj) {
+	    <span class="kwa">return</span> Arrays.<span class="kwd">equals</span>(bytes, ((ByteString)obj).bytes);
+        }
+
+        <span class="kwa">public</span> <span class="kwb">int</span> <span class="kwd">compareTo</span>(ByteString other) {
+	    <span class="kwa">if</span> (other.count != count) {
+		<span class="kwa">return</span> other.count - count;
+	    } <span class="kwa">else</span> {
+		<span class="slc">// Without this case, if there are two or more strings</span>
+		<span class="slc">// with exactly the same count in a Map, then the</span>
+		<span class="slc">// TreeSet constructor called in writeFrequencies will</span>
+		<span class="slc">// only add the first one, and the rest will not</span>
+		<span class="slc">// appear in the output.  Also this is required to</span>
+		<span class="slc">// satisfy the rules of the k-nucleotide problem.</span>
+		<span class="kwa">return</span> <span class="kwd">toString</span>().<span class="kwd">compareTo</span>(other.<span class="kwd">toString</span>());
+	    }
+        }
+
+	<span class="kwa">public</span> String <span class="kwd">toString</span>() {
+	    <span class="kwa">return new</span> <span class="kwd">String</span>(bytes);
+	}
+    }
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+openjdk 18 2022-03-22
+OpenJDK Runtime Environment
+(build 18+36-2087)
+OpenJDK 64-Bit Server VM
+(build 18+36-2087,
+mixed mode, sharing)
+
+
+Tue, 22 Mar 2022 17:59:23 GMT
+
+MAKE:
+mv knucleotide.java-3.java knucleotide.java
+/opt/src/jdk-18/bin/javac -d . -cp .:/opt/src/java-libs/fastutil-8.3.1.jar knucleotide.java
+
+1.97s to complete and log all make actions
+
+COMMAND LINE:
+/opt/src/jdk-18/bin/java  -cp .:/opt/src/java-libs/fastutil-8.3.1.jar knucleotide 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

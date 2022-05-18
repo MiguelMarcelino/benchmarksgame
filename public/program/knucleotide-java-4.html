@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>k-nucleotide Java&nbsp;#4 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>k-nucleotide Java&nbsp;#4 program</h1>
+    <aside>
+      <p><a href="../description/knucleotide.html#knucleotide">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">/* The Computer Language Benchmarks Game</span>
+<span class="com"> * https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com"> *</span>
+<span class="com"> * contributed by Daryl Griffith </span>
+<span class="com"> */</span>
+
+<span class="kwa">import</span> java.io.Closeable;
+<span class="kwa">import</span> java.io.IOException;
+<span class="kwa">import</span> java.io.InputStream;
+<span class="kwa">import</span> java.nio.ByteBuffer;
+<span class="kwa">import</span> java.util.ArrayList;
+<span class="kwa">import</span> java.util.Collections;
+<span class="kwa">import</span> java.util.Comparator;
+<span class="kwa">import</span> java.util.HashMap;
+<span class="kwa">import</span> java.util.List;
+<span class="kwa">import</span> java.util.Map;
+<span class="kwa">import</span> java.util.Map.Entry;
+
+<span class="kwa">public class</span> knucleotide {
+
+    <span class="kwa">static final</span> Map&lt;Key, Value&gt; MAP = <span class="kwa">new</span> HashMap&lt;&gt;();
+    <span class="kwa">static final</span> <span class="kwb">int</span>[] SEQUENCES1 = {<span class="num">2</span>, <span class="num">1</span>};
+    <span class="kwa">static final</span> <span class="kwb">int</span>[] SEQUENCES2 = {<span class="num">18</span>, <span class="num">12</span>, <span class="num">6</span>, <span class="num">4</span>, <span class="num">3</span>};
+    <span class="kwa">static final</span> String[] SPICIFIC_SEQUENCES = <span class="kwa">new</span> String[]{<span class="str">&quot;GGT&quot;</span>, <span class="str">&quot;GGTA&quot;</span>, <span class="str">&quot;GGTATT&quot;</span>, <span class="str">&quot;GGTATTTTAATT&quot;</span>, <span class="str">&quot;GGTATTTTAATTTATAGT&quot;</span>};
+    <span class="kwa">static final</span> <span class="kwb">int</span> LINE_LENGTH = <span class="num">60</span>;
+    <span class="kwa">static final</span> <span class="kwb">int</span> EOF = -<span class="num">1</span>;
+    <span class="kwa">static</span> <span class="kwb">byte</span>[] nucleotides;
+
+    <span class="kwa">public static</span> <span class="kwb">void</span> <span class="kwd">main</span>(String[] args) {
+        {
+            <span class="kwb">byte</span>[] temp = <span class="kwa">new</span> <span class="kwb">byte</span>[LINE_LENGTH];
+            <span class="kwb">byte</span>[] buffer = <span class="kwa">new</span> <span class="kwb">byte</span>[<span class="num">125</span>_000_000];
+            <span class="kwb">byte</span>[] species = <span class="str">&quot;&gt;TH&quot;</span>.<span class="kwd">getBytes</span>();
+            <span class="kwb">int</span> n;
+            <span class="kwb">int</span> i;
+
+            <span class="kwa">try</span> (LineInputStream <span class="kwa">in</span> = <span class="kwa">new</span> <span class="kwd">LineInputStream</span>(System.<span class="kwa">in</span>)) {
+outer:
+                <span class="kwa">for</span> (;;) {
+                    n = <span class="kwa">in</span>.<span class="kwd">readLine</span>(temp);
+                    <span class="kwa">if</span> (n == EOF) {
+                        <span class="kwa">return</span>;
+                    }
+                    <span class="kwa">if</span> (n != LINE_LENGTH) {
+                        <span class="kwa">for</span> (i = <span class="num">0</span>; i &lt; species.length; i++) {
+                            <span class="kwa">if</span> (temp[i] != species[i]) {
+                                <span class="kwa">continue</span> outer;
+                            }
+                        }
+                        <span class="kwa">break</span>;
+                    }
+                }
+                i = <span class="num">0</span>;
+                <span class="kwa">for</span> (;;) {
+                    n = <span class="kwa">in</span>.<span class="kwd">readLine</span>(temp);
+                    <span class="kwa">if</span> (n == EOF) {
+                        <span class="kwa">break</span>;
+                    }
+                    <span class="kwa">for</span> (<span class="kwb">int</span> j = <span class="num">0</span>; j &lt; n; i++, j++) {
+                        buffer[i] = <span class="kwd">translate</span>(temp[j]);
+                    }
+                }
+                <span class="kwa">if</span> (i == buffer.length) {
+                    nucleotides = buffer;
+                } <span class="kwa">else</span> {
+                    nucleotides = <span class="kwa">new</span> <span class="kwb">byte</span>[i];
+                    System.<span class="kwd">arraycopy</span>(buffer, <span class="num">0</span>, nucleotides, <span class="num">0</span>, i);
+                }
+            } <span class="kwa">catch</span> (IOException e) {
+
+            }
+        }
+        <span class="kwd">countSequences</span>(SEQUENCES1);
+        {
+            List&lt;Entry&lt;Key, Value&gt;&gt; sequence1 = <span class="kwa">new</span> ArrayList&lt;&gt;();
+            List&lt;Entry&lt;Key, Value&gt;&gt; sequence2 = <span class="kwa">new</span> ArrayList&lt;&gt;();
+
+            <span class="kwa">for</span> (Entry&lt;Key, Value&gt; entry : MAP.<span class="kwd">entrySet</span>()) {
+                <span class="kwa">switch</span> (Long.<span class="kwd">numberOfLeadingZeros</span>(entry.<span class="kwd">getKey</span>().key)) {
+                    <span class="kwa">case</span> <span class="num">61</span>:
+                        sequence1.<span class="kwd">add</span>(entry);
+                        <span class="kwa">break</span>;
+                    <span class="kwa">case</span> <span class="num">59</span>:
+                        sequence2.<span class="kwd">add</span>(entry);
+                }
+            }
+            <span class="kwd">printSequence</span>(sequence1);
+            <span class="kwd">printSequence</span>(sequence2);
+        }
+        <span class="kwd">countSequences</span>(SEQUENCES2);
+        {
+            Key key = <span class="kwa">new</span> <span class="kwd">Key</span>();
+
+            <span class="kwa">for</span> (String sequence : SPICIFIC_SEQUENCES) {
+                key.<span class="kwd">setHash</span>(sequence);
+                System.out.<span class="kwd">print</span>(MAP.<span class="kwd">get</span>(key).count);
+                System.out.<span class="kwd">print</span>(<span class="str">&apos;</span><span class="esc">\t</span><span class="str">&apos;</span>);
+                System.out.<span class="kwd">println</span>(sequence);
+            }
+        }
+    }
+        
+    <span class="kwa">static</span> <span class="kwb">byte</span> <span class="kwd">translate</span>(<span class="kwb">byte</span> b) {
+        <span class="kwa">return</span> (<span class="kwb">byte</span>) ((b &gt;&gt; <span class="num">1</span>) &amp; <span class="num">3</span>);
+    }
+
+    <span class="kwa">static</span> <span class="kwb">void</span> <span class="kwd">countSequences</span>(<span class="kwb">int</span>[] sequences) {
+        <span class="kwa">for</span> (<span class="kwb">int</span> sequence : sequences) {
+            <span class="kwd">updateHashtable</span>(sequence);
+        }
+    }
+
+    <span class="kwa">static</span> <span class="kwb">void</span> <span class="kwd">updateHashtable</span>(<span class="kwb">int</span> sequence) {
+        <span class="kwb">int</span> sequenceTop = nucleotides.length - sequence + <span class="num">1</span>;
+        Key key = <span class="kwa">new</span> <span class="kwd">Key</span>();
+        Value value;
+        
+        <span class="kwa">for</span> (<span class="kwb">int</span> i = <span class="num">0</span>; i &lt; sequenceTop; i++) {
+            key.<span class="kwd">setHash</span>(i, sequence);
+            value = MAP.<span class="kwd">get</span>(key);
+            <span class="kwa">if</span> (value == null) {
+                value = <span class="kwa">new</span> <span class="kwd">Value</span>();
+                value.count = <span class="num">1</span>;
+                MAP.<span class="kwd">put</span>(key, value);
+                key = <span class="kwa">new</span> <span class="kwd">Key</span>();
+            } <span class="kwa">else</span> {
+                value.count++;
+            }
+        }
+    }
+
+    <span class="kwa">static</span> <span class="kwb">void</span> <span class="kwd">printSequence</span>(List&lt;Entry&lt;Key, Value&gt;&gt; sequence) {
+        <span class="kwb">int</span> sum = <span class="num">0</span>;
+
+        Collections.<span class="kwd">sort</span>(sequence, <span class="kwa">new</span> Comparator&lt;Entry&lt;Key, Value&gt;&gt;() {
+
+            <span class="kwc">&#64;Override</span>
+            <span class="kwa">public</span> <span class="kwb">int</span> <span class="kwd">compare</span>(Entry&lt;Key, Value&gt; entry1, Entry&lt;Key, Value&gt; entry2) {
+                <span class="kwa">if</span> (entry2.<span class="kwd">getValue</span>().count != entry1.<span class="kwd">getValue</span>().count) {
+                    <span class="kwa">return</span> entry2.<span class="kwd">getValue</span>().count - entry1.<span class="kwd">getValue</span>().count;
+                }
+                <span class="kwa">return</span> entry1.<span class="kwd">getKey</span>().<span class="kwd">toString</span>().<span class="kwd">compareTo</span>(entry2.<span class="kwd">getKey</span>().<span class="kwd">toString</span>());
+            }
+        });
+        <span class="kwa">for</span> (Entry&lt;Key, Value&gt; entry : sequence) {
+            sum += entry.<span class="kwd">getValue</span>().count;
+        }
+        <span class="kwa">for</span> (Entry&lt;Key, Value&gt; entry : sequence) {
+            System.out.<span class="kwd">format</span>(<span class="str">&quot;%s %.3f</span><span class="esc">\n</span><span class="str">&quot;</span>, entry.<span class="kwd">getKey</span>(), entry.<span class="kwd">getValue</span>().count * <span class="num">100</span>f / sum);
+        }
+        System.out.<span class="kwd">println</span>();
+    }
+
+    <span class="kwa">static class</span> LineInputStream <span class="kwa">implements</span> Closeable {
+
+        <span class="kwa">private static final</span> <span class="kwb">int</span> LF = <span class="num">10</span>;
+        <span class="kwa">private final</span> ByteBuffer buffer = ByteBuffer.<span class="kwd">allocate</span>(<span class="num">8192</span>);
+        <span class="kwa">private final</span> InputStream <span class="kwa">in</span>;
+
+        <span class="kwa">public</span> <span class="kwd">LineInputStream</span>(InputStream <span class="kwa">in</span>) {
+            <span class="kwa">this</span>.<span class="kwa">in</span> = <span class="kwa">in</span>;
+            buffer.<span class="kwd">limit</span>(buffer.<span class="kwd">position</span>());
+        }
+
+        <span class="kwa">public</span> <span class="kwb">int</span> <span class="kwd">readLine</span>(<span class="kwb">byte</span>[] b) <span class="kwa">throws</span> IOException {
+            <span class="kwa">for</span> (<span class="kwb">int</span> end = buffer.<span class="kwd">position</span>(); end &lt; buffer.<span class="kwd">limit</span>(); end++) {
+                <span class="kwa">if</span> (buffer.<span class="kwd">get</span>(end) == LF) {
+                    <span class="kwa">if</span> (end - buffer.<span class="kwd">position</span>() == LINE_LENGTH) {
+                        buffer.<span class="kwd">get</span>(b);
+                        buffer.<span class="kwd">position</span>(buffer.<span class="kwd">position</span>() + <span class="num">1</span>);
+                        <span class="kwa">return</span> LINE_LENGTH;
+                    } <span class="kwa">else</span> {
+                        <span class="kwb">int</span> size = end - buffer.<span class="kwd">position</span>();
+
+                        buffer.<span class="kwd">get</span>(b, <span class="num">0</span>, size);
+                        buffer.<span class="kwd">position</span>(buffer.<span class="kwd">position</span>() + <span class="num">1</span>);
+                        <span class="kwa">return</span> size;
+                    }
+                }
+            }
+            buffer.<span class="kwd">compact</span>();
+            <span class="kwb">int</span> n = <span class="kwa">in</span>.<span class="kwd">read</span>(buffer.<span class="kwd">array</span>(), buffer.<span class="kwd">position</span>(), buffer.<span class="kwd">remaining</span>());
+
+            <span class="kwa">if</span> (n == EOF) {
+                buffer.<span class="kwd">flip</span>();
+                <span class="kwa">if</span> (buffer.<span class="kwd">hasRemaining</span>()) {
+                    <span class="kwb">int</span> size = buffer.<span class="kwd">remaining</span>();
+
+                    buffer.<span class="kwd">get</span>(b, <span class="num">0</span>, size);
+                    <span class="kwa">return</span> size;
+                } <span class="kwa">else</span> {
+                    <span class="kwa">return</span> EOF;
+                }
+            } <span class="kwa">else</span> {
+                buffer.<span class="kwd">position</span>(buffer.<span class="kwd">position</span>() + n);
+                buffer.<span class="kwd">flip</span>();
+            }
+            <span class="kwa">for</span> (<span class="kwb">int</span> end = buffer.<span class="kwd">position</span>(); end &lt; buffer.<span class="kwd">limit</span>(); end++) {
+                <span class="kwa">if</span> (buffer.<span class="kwd">get</span>(end) == LF) {
+                    <span class="kwa">if</span> (end - buffer.<span class="kwd">position</span>() == LINE_LENGTH) {
+                        buffer.<span class="kwd">get</span>(b);
+                        buffer.<span class="kwd">position</span>(buffer.<span class="kwd">position</span>() + <span class="num">1</span>);
+                        <span class="kwa">return</span> LINE_LENGTH;
+                    } <span class="kwa">else</span> {
+                        <span class="kwb">int</span> size = end - buffer.<span class="kwd">position</span>();
+
+                        buffer.<span class="kwd">get</span>(b, <span class="num">0</span>, size);
+                        buffer.<span class="kwd">position</span>(buffer.<span class="kwd">position</span>() + <span class="num">1</span>);
+                        <span class="kwa">return</span> size;
+                    }
+                }
+            }
+            <span class="kwa">return</span> EOF;
+        }
+
+        <span class="kwc">&#64;Override</span>
+        <span class="kwa">public</span> <span class="kwb">void</span> <span class="kwd">close</span>() <span class="kwa">throws</span> IOException {
+            <span class="kwa">in</span>.<span class="kwd">close</span>();
+        }
+    }
+
+    <span class="kwa">static class</span> Key {
+
+        <span class="kwb">long</span> key;
+
+        <span class="kwb">void</span> <span class="kwd">setHash</span>(<span class="kwb">int</span> offset, <span class="kwb">int</span> length) {
+            key = <span class="num">1</span>;
+            <span class="kwa">for</span> (<span class="kwb">int</span> i = offset + length - <span class="num">1</span>; i &gt;= offset; i--) {
+                key = (key &lt;&lt; <span class="num">2</span>) | nucleotides[i];
+            }
+        }
+
+        <span class="kwb">void</span> <span class="kwd">setHash</span>(String species) {
+            key = <span class="num">1</span>;
+            <span class="kwa">for</span> (<span class="kwb">int</span> i = species.<span class="kwd">length</span>() - <span class="num">1</span>; i &gt;= <span class="num">0</span>; i--) {
+                key = (key &lt;&lt; <span class="num">2</span>) | <span class="kwd">translate</span>((<span class="kwb">byte</span>) species.<span class="kwd">charAt</span>(i));
+            }
+        }
+
+        <span class="kwc">&#64;Override</span>
+        <span class="kwa">public</span> <span class="kwb">int</span> <span class="kwd">hashCode</span>() {
+            <span class="kwa">return</span> (<span class="kwb">int</span>) key;
+        }
+
+        <span class="kwc">&#64;Override</span>
+        <span class="kwa">public</span> <span class="kwb">boolean</span> <span class="kwd">equals</span>(Object obj) {
+            <span class="kwa">final</span> Key other = (Key) obj;
+
+            <span class="kwa">return</span> key == other.key;
+        }
+
+        <span class="kwc">&#64;Override</span>
+        <span class="kwa">public</span> String <span class="kwd">toString</span>() {
+            <span class="kwb">char</span>[] name = <span class="kwa">new</span> <span class="kwb">char</span>[(<span class="num">63</span> - Long.<span class="kwd">numberOfLeadingZeros</span>(key)) / <span class="num">2</span>];
+            <span class="kwb">long</span> temp = key;
+
+            <span class="kwa">for</span> (<span class="kwb">int</span> i = <span class="num">0</span>; temp &gt; <span class="num">1</span>; temp &gt;&gt;= <span class="num">2</span>, i++) {
+                name[i] = (<span class="kwb">char</span>) (((temp &amp; <span class="num">3</span>) &lt;&lt; <span class="num">1</span>) | <span class="str">&apos;A&apos;</span>);
+                <span class="kwa">if</span> (name[i] == <span class="str">&apos;E&apos;</span>) {
+                    name[i] = <span class="str">&apos;T&apos;</span>;
+                }
+            }
+            <span class="kwa">return new</span> <span class="kwd">String</span>(name);
+        }
+    }
+
+    <span class="kwa">static class</span> Value {
+
+        <span class="kwb">int</span> count;
+    }
+}
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+openjdk 18 2022-03-22
+OpenJDK Runtime Environment
+(build 18+36-2087)
+OpenJDK 64-Bit Server VM
+(build 18+36-2087,
+mixed mode, sharing)
+
+
+Tue, 22 Mar 2022 18:02:28 GMT
+
+MAKE:
+mv knucleotide.java-4.java knucleotide.java
+/opt/src/jdk-18/bin/javac -d . -cp .:/opt/src/java-libs/fastutil-8.3.1.jar knucleotide.java
+
+1.84s to complete and log all make actions
+
+COMMAND LINE:
+/opt/src/jdk-18/bin/java  -cp .:/opt/src/java-libs/fastutil-8.3.1.jar knucleotide 0 &lt; knucleotide-input25000000.txt
+
+PROGRAM OUTPUT:
+A 30.295
+T 30.151
+C 19.800
+G 19.754
+
+AA 9.177
+TA 9.132
+AT 9.131
+TT 9.091
+CA 6.002
+AC 6.001
+AG 5.987
+GA 5.984
+CT 5.971
+TC 5.971
+GT 5.957
+TG 5.956
+CC 3.917
+GC 3.911
+CG 3.909
+GG 3.902
+
+1471758	GGT
+446535	GGTA
+47336	GGTATT
+893	GGTATTTTAATT
+893	GGTATTTTAATTTATAGT
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

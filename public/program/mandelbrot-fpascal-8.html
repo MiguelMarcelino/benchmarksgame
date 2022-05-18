@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>mandelbrot Free Pascal&nbsp;#8 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>mandelbrot Free Pascal&nbsp;#8 program</h1>
+    <aside>
+      <p><a href="../description/mandelbrot.html#mandelbrot">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="com">(* The Computer Language Benchmarks Game</span>
+<span class="com">   https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="com">   - Based on &quot;Go #4&quot; by Martin Koistinen</span>
+<span class="com">   - Contributed by Akira1364</span>
+<span class="com">*)</span>
+
+<span class="kwa">program</span> Mandelbrot;
+
+<span class="kwa">uses</span> CMem, <span class="com">{$ifdef Unix}</span>CThreads,<span class="com">{$ENDIF}</span> SysUtils, Math, MTProcs;
+
+<span class="kwa">const</span>
+  Limit = <span class="num">4.0</span>;
+  Size: PtrInt = <span class="num">200</span>;
+
+<span class="kwa">type</span>
+  TData = <span class="kwa">record</span>
+    Rows: PByte;
+    InitialR, InitialI: PDouble;
+  <span class="kwa">end</span>;
+
+  PData = ^TData;
+
+<span class="kwa">var</span>
+  BytesPerRow: PtrInt;
+  Inv: <span class="kwb">Double</span>;
+
+  <span class="kwa">procedure</span> <span class="kwd">RenderRows</span>(Index: PtrInt;
+                       UserData: <span class="kwb">Pointer</span>;
+                       Item: TMultiThreadProcItem);
+  <span class="kwa">var</span>
+    Res, B: <span class="kwb">Byte</span>;
+    XByte, I, J, X: PtrInt;
+    ZRA, ZRB, ZIA, ZIB, TRA, TRB, TIA, TIB, CRA, CRB, CI: <span class="kwb">Double</span>;
+  <span class="kwa">begin</span>
+    CI := <span class="kwd">TData</span>(UserData^).InitialI[Index];
+    <span class="kwc">for</span> XByte := <span class="kwd">Pred</span>(BytesPerRow) <span class="kwc">downto</span> <span class="num">0</span> <span class="kwc">do</span> <span class="kwa">begin</span>
+      Res := <span class="num">0</span>;
+      I := <span class="num">0</span>;
+      <span class="kwc">repeat</span>
+        X := XByte <span class="kwa">shl</span> <span class="num">3</span>;
+        <span class="kwc">with</span> <span class="kwd">TData</span>(UserData^) <span class="kwc">do</span> <span class="kwa">begin</span>
+          CRA := InitialR[X + I];
+          CRB := InitialR[X + I + <span class="num">1</span>];
+        <span class="kwa">end</span>;
+        ZRA := CRA;
+        ZIA := CI;
+        ZRB := CRB;
+        ZIB := CI;
+        B := <span class="num">0</span>;
+        <span class="kwc">for</span> J := <span class="num">49</span> <span class="kwc">downto</span> <span class="num">0</span> <span class="kwc">do</span> <span class="kwa">begin</span>
+          TRA := ZRA * ZRA;
+          TIA := ZIA * ZIA;
+          <span class="kwc">if</span> TRA + TIA &gt; Limit <span class="kwc">then</span> <span class="kwa">begin</span>
+            B := B <span class="kwa">or</span> <span class="num">2</span>;
+            <span class="kwc">if</span> B = <span class="num">3</span> <span class="kwc">then</span> Break;
+          <span class="kwa">end</span>;
+          TRB := ZRB * ZRB;
+          TIB := ZIB * ZIB;
+          <span class="kwc">if</span> TRB + TIB &gt; Limit <span class="kwc">then</span> <span class="kwa">begin</span>
+            B := B <span class="kwa">or</span> <span class="num">1</span>;
+            <span class="kwc">if</span> B = <span class="num">3</span> <span class="kwc">then</span> Break;
+          <span class="kwa">end</span>;
+          ZIA := <span class="num">2</span> * ZRA * ZIA + CI;
+          ZRA := TRA - TIA + CRA;
+          ZIB := <span class="num">2</span> * ZRB * ZIB + CI;
+          ZRB := TRB - TIB + CRB;
+        <span class="kwa">end</span>;
+        Res := (Res <span class="kwa">shl</span> <span class="num">2</span>) <span class="kwa">or</span> B;
+        I += <span class="num">2</span>;
+      <span class="kwc">until</span> I = <span class="num">8</span>;
+      <span class="kwd">TData</span>(UserData^).Rows[(Index * BytesPerRow) + XByte] := <span class="kwa">not</span> Res;
+    <span class="kwa">end</span>;
+  <span class="kwa">end</span>;
+
+  <span class="kwa">procedure</span> <span class="kwd">MakeLookupTables</span>(Index: PtrInt;
+                             UserData: <span class="kwb">Pointer</span>;
+                             Item: TMultiThreadProcItem);
+  <span class="kwa">var</span> InvScaled: <span class="kwb">Double</span>;
+  <span class="kwa">begin</span>
+    InvScaled := Inv * <span class="kwb">Double</span>(Index);
+    <span class="kwc">with</span> <span class="kwd">TData</span>(UserData^) <span class="kwc">do</span> <span class="kwa">begin</span>
+      InitialI[Index] := InvScaled - <span class="num">1.0</span>;
+      InitialR[Index] := InvScaled - <span class="num">1.5</span>;
+    <span class="kwa">end</span>;
+  <span class="kwa">end</span>;
+
+<span class="kwa">var</span>
+  Data: TData;
+  IO: PText;
+
+<span class="kwa">begin</span>
+  <span class="kwd">SetExceptionMask</span>([exInvalidOp, exOverflow, exPrecision]);
+  <span class="kwc">if</span> ParamCount &gt; <span class="num">0</span> <span class="kwc">then</span> <span class="kwd">Val</span>(<span class="kwd">ParamStr</span>(<span class="num">1</span>), Size);
+  BytesPerRow := Size <span class="kwa">shr</span> <span class="num">3</span>;
+  <span class="kwc">with</span> Data <span class="kwc">do</span> <span class="kwa">begin</span>
+    <span class="kwd">GetMem</span>(InitialI, <span class="kwd">SizeOf</span>(<span class="kwb">Double</span>) * Size);
+    <span class="kwd">GetMem</span>(InitialR, <span class="kwd">SizeOf</span>(<span class="kwb">Double</span>) * Size);
+    <span class="kwd">GetMem</span>(Rows, BytesPerRow * Size);
+  <span class="kwa">end</span>;
+  Inv := <span class="num">2.0</span> / <span class="kwb">Double</span>(Size);
+  <span class="kwc">with</span> ProcThreadPool <span class="kwc">do</span> <span class="kwa">begin</span>
+    <span class="kwd">DoParallel</span>(&#64;MakeLookupTables, <span class="num">0</span>, <span class="kwd">Pred</span>(Size), &#64;Data);
+    <span class="kwd">DoParallel</span>(&#64;RenderRows, <span class="num">0</span>, <span class="kwd">Pred</span>(Size), &#64;Data);
+  <span class="kwa">end</span>;
+  IO := &#64;Output;
+  <span class="kwd">Write</span>(IO^, <span class="str">&apos;P4&apos;</span>, <span class="esc">#10</span>, Size, <span class="str">&apos; &apos;</span>, Size, <span class="esc">#10</span>);
+  <span class="kwd">Flush</span>(IO^);
+  <span class="kwd">FileWrite</span>(StdOutPutHandle, Data.Rows[<span class="num">0</span>], BytesPerRow * Size);
+  <span class="kwc">with</span> Data <span class="kwc">do</span> <span class="kwa">begin</span>
+    <span class="kwd">FreeMem</span>(InitialI);
+    <span class="kwd">FreeMem</span>(InitialR);
+    <span class="kwd">FreeMem</span>(Rows);
+  <span class="kwa">end</span>;
+<span class="kwa">end</span>.
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+Free Pascal Compiler
+version 3.2.2 [2021/05/16]
+
+
+Mon, 10 Jan 2022 02:07:32 GMT
+
+MAKE:
+mv mandelbrot.fpascal-8.fpascal mandelbrot.fpascal-8.pas
+/opt/src/fpc-3.2.2/bin/fpc -FuInclude/fpascal -XXs -O3 -Ci- -Cr- -g- -CpCOREAVX -CfAVX -Tlinux  -oFPASCAL_RUN mandelbrot.fpascal-8.pas
+Free Pascal Compiler version 3.2.2 [2021/05/16] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Linux for x86-64
+Compiling mandelbrot.fpascal-8.pas
+Compiling ./Include/fpascal/mtprocs.pas
+Compiling ./Include/fpascal/mtpcpu.pas
+mtprocs.pas(235,3) Note: Call to subroutine &quot;procedure TProcThreadPool.EnterPoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(252,5) Note: Call to subroutine &quot;procedure TProcThreadPool.LeavePoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(302,3) Note: Call to subroutine &quot;procedure TProcThreadPool.EnterPoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(308,7) Note: Call to subroutine &quot;procedure TProcThreadGroup.RemoveThread(AThread:TProcThread);&quot; marked as inline is not inlined
+mtprocs.pas(319,5) Note: Call to subroutine &quot;procedure TProcThreadPool.LeavePoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(351,7) Note: Call to subroutine &quot;procedure TProcThreadGroup.Run(Index:Int64;Data:Pointer;Item:TMultiThreadProcItem);&quot; marked as inline is not inlined
+mtprocs.pas(353,7) Note: Call to subroutine &quot;procedure TProcThreadPool.EnterPoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(380,9) Note: Call to subroutine &quot;procedure TProcThreadPool.LeavePoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(624,3) Note: Call to subroutine &quot;procedure TProcThreadPool.EnterPoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(637,5) Note: Call to subroutine &quot;procedure TProcThreadPool.LeavePoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(645,3) Note: Call to subroutine &quot;procedure TProcThreadPool.EnterPoolCriticalSection;&quot; marked as inline is not inlined
+mtprocs.pas(653,5) Note: Call to subroutine &quot;procedure TProcThreadPool.LeavePoolCriticalSection;&quot; marked as inline is not inlined
+Linking FPASCAL_RUN
+1097 lines compiled, 1.0 sec
+12 note(s) issued
+mv FPASCAL_RUN mandelbrot.fpascal-8.fpascal_run
+rm mandelbrot.fpascal-8.pas
+
+1.33s to complete and log all make actions
+
+COMMAND LINE:
+./mandelbrot.fpascal-8.fpascal_run 16000
+
+(BINARY) PROGRAM OUTPUT NOT SHOWN
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+

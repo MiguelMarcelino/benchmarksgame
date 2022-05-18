@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow,noarchive">
+
+<title>spectral-norm Haskell GHC&nbsp;#4 program (Benchmarks Game) </title>
+<style><!--
+a{color:black;text-decoration:none}article{padding:0 0 2.9em}article,div,footer,header{margin:auto;width:92%}body{font:100% Droid Sans, Ubuntu, Verdana, sans-serif;margin:0;-webkit-text-size-adjust:100%}h3, h1, h2, li a{font-family:Ubuntu Mono,Consolas,Menlo,monospace}div,footer,header{max-width:31em}footer{padding:2.6em 0 0}h3{font-size:1.4em;font-weight:bold;margin:0;padding: .4em}h3, h3 a{color:white;background-color:#77216f}h3 small{font-size:0.64em}h1,h2{margin:1.5em 0 0}h1{font-size:1.4em;font-weight:normal}h2{font-size:1.2em}li{list-style-type:none;vertical-align:top}li a{display:block;font-size:1.2em;margin: .5em .5em 0;padding: .5em .5em .3em}ul{clear:left;margin:-0.3em 0 1.5em;padding-left:0;text-align:center}p{color:#333;line-height:1.4;margin: .3em 0 0}p a, a span{border-bottom: .1em solid #333;padding-bottom: .1em}.com,.slc{color:#888}.kwa{color:#066}.kwb{color:#900}.kwc{color:#050}.kwa,.kwb,.kwc{font-weight:bold}.dstr,.str,.sym,.num{color:#930}pre{color:#222;font-size:1em;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word}@media only screen and (min-width: 60em){article,footer,header{font-size:1.25em}}
+--></style>
+<link rel="shortcut icon" href="../favicon.ico">
+<header>
+  <h3><a href="https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html">The&nbsp;<small>Computer&nbsp;Language</small><br>22.03 Benchmarks&nbsp;Game</a></h3>
+</header>
+<article>
+  <div>
+    <h1>spectral-norm Haskell GHC&nbsp;#4 program</h1>
+    <aside>
+      <p><a href="../description/spectralnorm.html#spectralnorm">description</a>
+    </aside>
+  </div>
+  <section>
+    <div>
+      <h2>source code</h2>
+    </div>
+    <pre>
+<span class="slc">--</span>
+<span class="slc">-- The Computer Language Benchmarks Game</span>
+<span class="slc">-- https://salsa.debian.org/benchmarksgame-team/benchmarksgame/</span>
+<span class="slc">--</span>
+<span class="slc">-- Modified by Gabriel Gonzalez</span>
+<span class="slc">-- Modified by Ryan Trinkle: 1) change from divInt# to uncheckedIShiftRA#</span>
+<span class="slc">--                           2) changed -optc-O to -optc-O3</span>
+<span class="slc">--                           3) added -optc-ffast-math</span>
+<span class="slc">-- Translation from Clean by Don Stewart</span>
+<span class="slc">-- Parallelized by Louis Wasserman</span>
+<span class="slc">--</span>
+<span class="slc">-- Should be compiled with:</span>
+<span class="slc">-- 	-threaded -funbox-strict-fields -O2 -fvia-c -optc-O3 </span>
+<span class="slc">-- 	-fexcess-precision -optc-ffast-math </span>
+<span class="slc">-- Should be run with:</span>
+<span class="slc">-- 	+RTS -N&lt;number of cores&gt;</span>
+
+<span class="kwd">import</span> System.Environment
+<span class="kwd">import</span> Foreign.Marshal.<span class="kwb">Array</span>
+<span class="kwd">import</span> Foreign
+<span class="kwd">import</span> Text.Printf
+<span class="kwd">import</span> Control.Concurrent
+<span class="kwd">import</span> Control.Monad
+<span class="kwd">import</span> GHC.Base
+<span class="kwd">import</span> GHC.Conc
+
+<span class="kwd">type</span> Reals = Ptr <span class="kwb">Double</span>
+
+main = <span class="kwd">do</span>
+    n &lt;- <span class="kwc">getArgs</span> &gt;&gt;= <span class="kwc">readIO</span> . <span class="kwc">head</span>
+    allocaArray n $ \ u -&gt; allocaArray n $ \ v -&gt; <span class="kwd">do</span>
+      forM_ [<span class="num">0</span>..n-<span class="num">1</span>] $ \i -&gt; pokeElemOff u i <span class="num">1</span> &gt;&gt; pokeElemOff v i <span class="num">0</span>
+
+      powerMethod <span class="num">10</span> n u v
+      printf <span class="str">&quot;%.9f</span><span class="esc">\n</span><span class="str">&quot;</span> =&lt;&lt; eigenvalue n u v <span class="num">0 0 0</span>
+
+<span class="slc">------------------------------------------------------------------------</span>
+
+eigenvalue :: <span class="kwb">Int</span> -&gt; Reals -&gt; Reals -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">Double</span> -&gt; <span class="kwb">Double</span> -&gt; <span class="kwb">IO Double</span>
+eigenvalue !n !u !v !i !vBv !vv
+    | i &lt; n     = <span class="kwd">do</span>	ui &lt;- peekElemOff u i
+			vi &lt;- peekElemOff v i
+			eigenvalue n u v (i+<span class="num">1</span>) (vBv + ui * vi) (vv + vi * vi)
+    | <span class="kwc">otherwise</span> = <span class="kwc">return</span> $! <span class="kwc">sqrt</span> $! vBv / vv
+
+<span class="slc">------------------------------------------------------------------------</span>
+
+<span class="slc">-- Essentially borrowed from the Java implementation.</span>
+<span class="kwd">data</span> CyclicBarrier = Cyclic !<span class="kwb">Int</span> !(MVar (<span class="kwb">Int</span>, [MVar ()]))
+
+await :: CyclicBarrier -&gt; <span class="kwb">IO</span> ()
+await (Cyclic k waitsVar) = <span class="kwd">do</span>
+	(x, waits) &lt;- takeMVar waitsVar
+	<span class="kwd">if</span> x &lt;= <span class="num">1</span> <span class="kwd">then do</span>
+		<span class="kwc">mapM_</span> (`putMVar` ()) waits
+		putMVar waitsVar (k, [])
+	  <span class="kwd">else do</span>
+	  	var &lt;- newEmptyMVar
+	  	putMVar waitsVar (x-<span class="num">1</span>,var:waits)
+	  	takeMVar var
+
+newCyclicBarrier :: <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> CyclicBarrier
+newCyclicBarrier k = <span class="kwc">liftM</span> (Cyclic k) (newMVar (k, []))
+
+powerMethod :: <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; Reals -&gt; Reals -&gt; <span class="kwb">IO</span> ()
+powerMethod z n u v = allocaArray n $ \ !t -&gt; <span class="kwd">do</span>
+	<span class="kwd">let</span> chunk = (n + numCapabilities - <span class="num">1</span>) `quotInt` numCapabilities
+	!barrier &lt;- newCyclicBarrier $! (n + chunk - <span class="num">1</span>) `quotInt` chunk
+	<span class="kwd">let</span> timesAtAv !s !d l r = <span class="kwd">do</span>
+		timesAv n s t l r
+		await barrier
+		timesAtv n t d l r
+		await barrier
+	<span class="kwd">let</span> thread !l !r = GHC.Base.<span class="kwc">foldr</span> (&gt;&gt;) (<span class="kwc">return</span> ()) $ <span class="kwc">replicate</span> z $ <span class="kwd">do</span>
+		timesAtAv u v l r
+		timesAtAv v u l r
+	<span class="kwd">let</span> go l = <span class="kwd">case</span> l + chunk <span class="kwd">of</span>
+		r | r &lt; n	-&gt; forkIO (thread l r) &gt;&gt; go r
+		  | <span class="kwc">otherwise</span>	-&gt; thread l n
+	go <span class="num">0</span>
+
+timesAv :: <span class="kwb">Int</span> -&gt; Reals -&gt; Reals -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> ()
+timesAv !n !u !au !l !r = go l <span class="kwd">where</span>
+    go :: <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> ()
+    go !i = <span class="kwc">when</span> (i &lt; r) $ <span class="kwd">do</span>
+	<span class="kwd">let</span> avsum !j !acc
+		| j &lt; n = <span class="kwd">do</span>
+			!uj &lt;- peekElemOff u j
+			avsum (j+<span class="num">1</span>) (acc + ((aij i j) * uj))
+		| <span class="kwc">otherwise</span> = pokeElemOff au i acc &gt;&gt; go (i+<span class="num">1</span>)
+	avsum <span class="num">0 0</span>
+
+timesAtv :: <span class="kwb">Int</span> -&gt; Reals -&gt; Reals -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> ()
+timesAtv !n !u !a !l !r = go l
+  <span class="kwd">where</span>
+    go :: <span class="kwb">Int</span> -&gt; <span class="kwb">IO</span> ()
+    go !i = <span class="kwc">when</span> (i &lt; r) $ <span class="kwd">do</span>
+	<span class="kwd">let</span> atvsum !j !acc 
+		| j &lt; n	= <span class="kwd">do</span>	!uj &lt;- peekElemOff u j
+				atvsum (j+<span class="num">1</span>) (acc + ((aij j i) * uj))
+		| <span class="kwc">otherwise</span> = pokeElemOff a i acc &gt;&gt; go (i+<span class="num">1</span>)
+	atvsum <span class="num">0 0</span>
+
+<span class="slc">--</span>
+<span class="slc">-- manually unbox the inner loop:</span>
+<span class="slc">-- aij i j = 1 / fromIntegral ((i+j) * (i+j+1) `div` 2 + i + 1)</span>
+<span class="slc">--</span>
+aij (I# i) (I# j) = D# (
+    <span class="kwd">case</span> i +# j <span class="kwd">of</span>
+        n -&gt; <span class="num">1.0</span>## /## int2Double# 
+        	(((n *# (n+#<span class="num">1</span>#)) `uncheckedIShiftRA#` <span class="num">1</span>#) +# (i +# <span class="num">1</span>#)))
+    </pre>
+  </section>
+  <section>
+    <div>
+      <h2 id="log">notes, command-line, and program output</h2>
+    </div>
+    <pre>
+NOTES:
+64-bit Ubuntu quad core
+The Glorious Glasgow Haskell
+Compilation System,
+version 9.2.1
+
+
+Tue, 25 Jan 2022 18:23:35 GMT
+
+MAKE:
+mv spectralnorm.ghc-4.ghc spectralnorm.ghc-4.hs
+~/.ghcup/ghc/9.2.1/bin/ghc --make -fllvm -O2 -XBangPatterns -threaded -rtsopts -XMagicHash spectralnorm.ghc-4.hs -o spectralnorm.ghc-4.ghc_run
+[1 of 1] Compiling Main             ( spectralnorm.ghc-4.hs, spectralnorm.ghc-4.o )
+
+spectralnorm.ghc-4.hs:41:21: warning: [-Wtabs]
+    Tab character found here, and in 68 further locations.
+    Please use spaces instead.
+   |
+41 |     | i &lt; n     = do    ui &lt;- peekElemOff u i
+   |                     ^^^^
+Linking spectralnorm.ghc-4.ghc_run ...
+rm spectralnorm.ghc-4.hs
+
+9.81s to complete and log all make actions
+
+COMMAND LINE:
+./spectralnorm.ghc-4.ghc_run +RTS -N4 -RTS 5500
+
+PROGRAM OUTPUT:
+1.274224153
+    </pre>
+  </section>
+</article>
+<footer>
+  <nav>
+    <ul>
+      <li><a href="../license.html"><span>3-Clause BSD License</span></a>
+    </ul>
+  </nav>
+</footer>
+
