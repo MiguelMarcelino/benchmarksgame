@@ -6,8 +6,6 @@
 
 import sys
 
-from time import perf_counter # Benchmarks
-
 def make_tree(depth: int) -> tuple:
     """ Trees or tuples, final leaves have None as values. """
     return (None, None) if depth == 0 else (
